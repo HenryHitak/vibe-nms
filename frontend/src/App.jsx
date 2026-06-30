@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BellRing,
-  DatabaseBackup,
   FileDown,
   FileUp,
   Gauge,
@@ -52,6 +51,7 @@ export default function App() {
   const [route, setRoute] = useState("dashboard");
   const [user, setUser] = useState(getStoredUser());
   const [summary, setSummary] = useState(null);
+  const [notifications, setNotifications] = useState([]);
   const [toasts, setToasts] = useState([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("nms.sidebarCollapsed") === "true");
@@ -99,6 +99,7 @@ export default function App() {
           api("/notifications?unread_only=true")
         ]);
         setSummary(summaryPayload);
+        setNotifications(notificationPayload);
         setToasts(notificationPayload.slice(0, 3));
       } catch {
         setSummary(null);
@@ -127,6 +128,7 @@ export default function App() {
     try {
       await api(`/notifications/${id}/read`, { method: "POST" });
     } finally {
+      setNotifications((current) => current.filter((notification) => notification.id !== id));
       setToasts((current) => current.filter((toast) => toast.id !== id));
     }
   }
@@ -183,10 +185,6 @@ export default function App() {
             </nav>
           </>
         ) : null}
-        {!sidebarCollapsed ? <div className="mt-6 rounded-md border border-line bg-slate-50 p-3 text-xs text-slate-600">
-          <div className="mb-1 font-semibold text-slate-700">Package</div>
-          <div className="flex items-center gap-2"><DatabaseBackup size={14} /> Docker Compose ready</div>
-        </div> : null}
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col p-3 md:p-5">
@@ -205,7 +203,12 @@ export default function App() {
               <div className="font-semibold text-ink">{user.display_name || user.username}</div>
               <div className="text-xs font-semibold text-slate-500">{role} / {user.last_login_ip || "IP -"}</div>
             </div>
-            <AlertBell count={summary?.active_alerts || 0} />
+            <AlertBell
+              count={notifications.length}
+              notifications={notifications}
+              onDismiss={dismissToast}
+              onViewAlerts={() => setRoute("alerts")}
+            />
             <button className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-line bg-white" title="Logout" onClick={logout}>
               <LogOut size={17} />
             </button>

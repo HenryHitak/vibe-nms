@@ -1,8 +1,15 @@
-import { TriangleAlert } from "lucide-react";
+import { useMemo, useState } from "react";
+import { TriangleAlert, X } from "lucide-react";
 
 export default function AlertBanner({ alerts = [] }) {
   const activeAlerts = alerts.filter((alert) => alert.status === "ACTIVE");
+  const alertSignature = useMemo(
+    () => activeAlerts.map((alert) => alert.id).sort((a, b) => a - b).join(","),
+    [activeAlerts]
+  );
+  const [dismissedSignature, setDismissedSignature] = useState("");
   if (!activeAlerts.length) return null;
+  if (alertSignature && dismissedSignature === alertSignature) return null;
 
   const severityRank = { CRITICAL: 0, WARNING: 1, INFO: 2 };
   const sorted = [...activeAlerts].sort((a, b) => (severityRank[a.severity] ?? 9) - (severityRank[b.severity] ?? 9));
@@ -27,7 +34,7 @@ export default function AlertBanner({ alerts = [] }) {
   return (
     <div className={`mb-4 flex items-center gap-3 rounded-md border px-4 py-3 text-sm shadow-sm ${classes}`}>
       <TriangleAlert size={18} className="shrink-0" />
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <span className="font-semibold">{severity}</span>
         <span className={`mx-2 ${divider}`}>/</span>
         {isPlantDrop ? (
@@ -50,6 +57,13 @@ export default function AlertBanner({ alerts = [] }) {
           </>
         )}
       </div>
+      <button
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-current/20 bg-white/50 hover:bg-white"
+        title="Dismiss alert banner"
+        onClick={() => setDismissedSignature(alertSignature)}
+      >
+        <X size={15} />
+      </button>
     </div>
   );
 }
