@@ -14,6 +14,8 @@ Install Vibe NMS.exe
 
 If Windows asks for administrator permission, approve it. Do not double-click `.ps1` files; on some company PCs those files open in VS Code or Notepad.
 
+Do not run `server\vibe-nms-server.exe` directly. That file is the backend runtime used internally by the installed Windows Scheduled Task.
+
 Open:
 
 ```text

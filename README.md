@@ -104,6 +104,8 @@ On the target PC, extract `vibe-nms-windows-installer.zip` and run the root file
 Install Vibe NMS.exe
 ```
 
+Do not run `server\vibe-nms-server.exe` directly. That file is the backend runtime used internally by the installed Windows Scheduled Task.
+
 Do not double-click `.ps1` files. On some company PCs they open in VS Code or Notepad. The `.exe` launcher handles PowerShell and administrator permission automatically.
 
 Open:
