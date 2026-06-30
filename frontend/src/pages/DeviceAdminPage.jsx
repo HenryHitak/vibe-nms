@@ -1,0 +1,222 @@
+import { useEffect, useState } from "react";
+import { Pencil, Plus, RotateCcw, Save, Trash2, X } from "lucide-react";
+import { api } from "../api.js";
+import AdminLayout from "../components/AdminLayout.jsx";
+import DeviceTable from "../components/DeviceTable.jsx";
+
+const EMPTY_DEVICE = {
+  plant_code: "",
+  plant_name: "",
+  building: "",
+  floor: "",
+  area: "",
+  zone: "",
+  line_code: "",
+  line_name: "",
+  detailed_location: "",
+  device_name: "",
+  device_type: "OTHER",
+  ip_address: "",
+  mac_address: "",
+  hostname: "",
+  connected_ap_name: "",
+  connected_ap_ip: "",
+  switch_name: "",
+  switch_port: "",
+  vlan: "",
+  owner_department: "",
+  criticality: "MEDIUM",
+  monitoring_enabled: true,
+  notes: ""
+};
+
+function Field({ label, name, value, onChange, type = "text" }) {
+  return (
+    <label className="block text-sm">
+      <span className="mb-1 block text-slate-600">{label}</span>
+      <input
+        className="h-10 w-full rounded-md border border-line bg-white px-3"
+        name={name}
+        type={type}
+        value={value ?? ""}
+        onChange={onChange}
+      />
+    </label>
+  );
+}
+
+export default function DeviceAdminPage() {
+  const [devices, setDevices] = useState([]);
+  const [includeDeleted, setIncludeDeleted] = useState(false);
+  const [query, setQuery] = useState("");
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(EMPTY_DEVICE);
+  const [error, setError] = useState("");
+
+  async function load() {
+    try {
+      const params = new URLSearchParams();
+      if (includeDeleted) params.set("include_deleted", "true");
+      if (query) params.set("q", query);
+      setDevices(await api(`/devices?${params.toString()}`));
+      setError("");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, [includeDeleted]);
+
+  function startCreate() {
+    setEditing(null);
+    setForm(EMPTY_DEVICE);
+  }
+
+  function startEdit(device) {
+    setEditing(device);
+    setForm({ ...EMPTY_DEVICE, ...device, monitoring_enabled: Boolean(device.monitoring_enabled) });
+  }
+
+  function updateForm(event) {
+    const { name, value, type, checked } = event.target;
+    setForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
+  }
+
+  async function save() {
+    try {
+      const payload = {
+        ...form,
+        vlan: form.vlan === "" || form.vlan == null ? null : Number(form.vlan),
+        monitoring_enabled: Boolean(form.monitoring_enabled)
+      };
+      if (editing?.id) {
+        await api(`/devices/${editing.id}`, { method: "PUT", body: JSON.stringify(payload) });
+      } else {
+        await api("/devices", { method: "POST", body: JSON.stringify(payload) });
+      }
+      await load();
+      startCreate();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function remove(device) {
+    try {
+      await api(`/devices/${device.id}`, { method: "DELETE" });
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function restore(device) {
+    try {
+      await api(`/devices/${device.id}/restore`, { method: "POST" });
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <AdminLayout
+      title="Device Master"
+      actions={
+        <>
+          <input className="h-10 rounded-md border border-line bg-white px-3 text-sm" placeholder="Search" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.key === "Enter" && load()} />
+          <label className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm">
+            <input type="checkbox" checked={includeDeleted} onChange={(event) => setIncludeDeleted(event.target.checked)} />
+            Deleted
+          </label>
+          <button className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-3 text-sm font-semibold text-white" onClick={startCreate}>
+            <Plus size={16} /> Add
+          </button>
+        </>
+      }
+    >
+      {error ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
+      <div className="grid h-full min-h-[650px] grid-cols-1 gap-4 xl:grid-cols-[1fr_440px]">
+        <DeviceTable
+          devices={devices}
+          onSelect={startEdit}
+          selectedId={editing?.id}
+          actions={(device) => (
+            <div className="inline-flex gap-2">
+              <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white" title="Edit" onClick={() => startEdit(device)}>
+                <Pencil size={14} />
+              </button>
+              {device.is_deleted ? (
+                <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white" title="Restore" onClick={() => restore(device)}>
+                  <RotateCcw size={14} />
+                </button>
+              ) : (
+                <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white text-red-700" title="Delete" onClick={() => remove(device)}>
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          )}
+        />
+
+        <aside className="overflow-auto border border-line bg-white p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-semibold">{editing?.id ? "Edit Device" : "Add Device"}</h2>
+            <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white" title="Clear" onClick={startCreate}>
+              <X size={15} />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-1">
+            <Field label="Plant Code" name="plant_code" value={form.plant_code} onChange={updateForm} />
+            <Field label="Plant Name" name="plant_name" value={form.plant_name} onChange={updateForm} />
+            <Field label="Line Code" name="line_code" value={form.line_code} onChange={updateForm} />
+            <Field label="Line Name" name="line_name" value={form.line_name} onChange={updateForm} />
+            <Field label="Device Name" name="device_name" value={form.device_name} onChange={updateForm} />
+            <label className="block text-sm">
+              <span className="mb-1 block text-slate-600">Device Type</span>
+              <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="device_type" value={form.device_type} onChange={updateForm}>
+                {["AP", "CAMERA", "CONTROLLER", "HMI", "IOT", "PLC", "PRINTER", "ROBOT", "SCANNER", "SENSOR", "SWITCH", "SERVER", "WORKSTATION", "OTHER"].map((value) => (
+                  <option key={value} value={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+            <Field label="IP Address" name="ip_address" value={form.ip_address} onChange={updateForm} />
+            <Field label="MAC Address" name="mac_address" value={form.mac_address} onChange={updateForm} />
+            <Field label="Hostname" name="hostname" value={form.hostname} onChange={updateForm} />
+            <Field label="Connected AP Name" name="connected_ap_name" value={form.connected_ap_name} onChange={updateForm} />
+            <Field label="Connected AP IP" name="connected_ap_ip" value={form.connected_ap_ip} onChange={updateForm} />
+            <Field label="Switch Name" name="switch_name" value={form.switch_name} onChange={updateForm} />
+            <Field label="Switch Port" name="switch_port" value={form.switch_port} onChange={updateForm} />
+            <Field label="VLAN" name="vlan" value={form.vlan ?? ""} onChange={updateForm} type="number" />
+            <Field label="Building" name="building" value={form.building} onChange={updateForm} />
+            <Field label="Floor" name="floor" value={form.floor} onChange={updateForm} />
+            <Field label="Area" name="area" value={form.area} onChange={updateForm} />
+            <Field label="Zone" name="zone" value={form.zone} onChange={updateForm} />
+            <Field label="Detailed Location" name="detailed_location" value={form.detailed_location} onChange={updateForm} />
+            <Field label="Owner Department" name="owner_department" value={form.owner_department} onChange={updateForm} />
+            <label className="block text-sm">
+              <span className="mb-1 block text-slate-600">Criticality</span>
+              <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="criticality" value={form.criticality} onChange={updateForm}>
+                {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm">
+              <input type="checkbox" name="monitoring_enabled" checked={Boolean(form.monitoring_enabled)} onChange={updateForm} />
+              Monitoring Enabled
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-slate-600">Notes</span>
+              <textarea className="min-h-20 w-full rounded-md border border-line bg-white px-3 py-2" name="notes" value={form.notes || ""} onChange={updateForm} />
+            </label>
+            <button className="mt-2 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-ink px-3 text-sm font-semibold text-white" onClick={save}>
+              <Save size={16} /> Save
+            </button>
+          </div>
+        </aside>
+      </div>
+    </AdminLayout>
+  );
+}
+

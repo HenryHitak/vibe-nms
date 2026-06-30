@@ -1,0 +1,81 @@
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${NMS_MSSQL_PASSWORD:-ChangeThisStrongPassword!123}
+      MSSQL_PID: Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - nms-mssql-data:/var/opt/mssql
+    restart: unless-stopped
+    networks:
+      - nms
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      NMS_DATABASE_ENGINE: ${NMS_DATABASE_ENGINE:-mssql}
+      NMS_DATABASE_PATH: ${NMS_DATABASE_PATH:-/app/data/nms.sqlite}
+      NMS_MSSQL_SERVER: ${NMS_MSSQL_SERVER:-mssql}
+      NMS_MSSQL_PORT: ${NMS_MSSQL_PORT:-1433}
+      NMS_MSSQL_DATABASE: ${NMS_MSSQL_DATABASE:-vibe_nms}
+      NMS_MSSQL_USERNAME: ${NMS_MSSQL_USERNAME:-sa}
+      NMS_MSSQL_PASSWORD: ${NMS_MSSQL_PASSWORD:-ChangeThisStrongPassword!123}
+      NMS_MSSQL_DRIVER: ${NMS_MSSQL_DRIVER:-ODBC Driver 18 for SQL Server}
+      NMS_MSSQL_TRUST_SERVER_CERTIFICATE: ${NMS_MSSQL_TRUST_SERVER_CERTIFICATE:-true}
+      NMS_ALLOWED_ORIGINS: ${NMS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5177,http://localhost}
+      NMS_TRUSTED_PROXY_IPS: ${NMS_TRUSTED_PROXY_IPS:-}
+      NMS_CORPORATE_NETWORKS: ${NMS_CORPORATE_NETWORKS:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+      NMS_COLLECTOR_ENABLED: ${NMS_COLLECTOR_ENABLED:-true}
+      NMS_COLLECTOR_INTERVAL_SECONDS: ${NMS_COLLECTOR_INTERVAL_SECONDS:-30}
+      NMS_COLLECTOR_TIMEOUT_MS: ${NMS_COLLECTOR_TIMEOUT_MS:-1000}
+      NMS_WARNING_LATENCY_MS: ${NMS_WARNING_LATENCY_MS:-150}
+      NMS_CRITICAL_LATENCY_MS: ${NMS_CRITICAL_LATENCY_MS:-500}
+      NMS_WARNING_PACKET_LOSS_PERCENT: ${NMS_WARNING_PACKET_LOSS_PERCENT:-5}
+      NMS_DEFAULT_ROLE: ${NMS_DEFAULT_ROLE:-USER}
+      NMS_SEED_SAMPLE_DATA: ${NMS_SEED_SAMPLE_DATA:-true}
+      NMS_AUTH_SECRET: ${NMS_AUTH_SECRET:-change-this-to-a-long-random-secret}
+      NMS_TOKEN_TTL_MINUTES: ${NMS_TOKEN_TTL_MINUTES:-720}
+      NMS_BOOTSTRAP_ADMIN_USERNAME: ${NMS_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      NMS_BOOTSTRAP_ADMIN_PASSWORD: ${NMS_BOOTSTRAP_ADMIN_PASSWORD:-Admin123!}
+      NMS_BOOTSTRAP_ADMIN_EMAIL: ${NMS_BOOTSTRAP_ADMIN_EMAIL:-admin@example.internal}
+    volumes:
+      - nms-data:/app/data
+    depends_on:
+      - mssql
+    restart: unless-stopped
+    networks:
+      - nms
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api
+    restart: unless-stopped
+    networks:
+      - nms
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nms.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+    networks:
+      - nms
+
+volumes:
+  nms-data:
+  nms-mssql-data:
+
+networks:
+  nms:
+    driver: bridge

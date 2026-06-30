@@ -1,0 +1,14 @@
+data/
+logs/
+.env
+dist/
+node_modules/
+__pycache__/
+.pytest_cache/
+.venv/
+*.pyc
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+vibe-nms-release/
+vibe-nms-release.zip
