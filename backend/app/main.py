@@ -207,6 +207,26 @@ def _get_device(conn: sqlite3.Connection, device_id: int) -> dict[str, Any]:
     return row_to_dict(row) or {}
 
 
+def _get_user_or_404(conn: sqlite3.Connection, user_id: int) -> dict[str, Any]:
+    user = row_to_dict(conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone())
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+def _guard_user_removal(conn: sqlite3.Connection, user: dict[str, Any], actor: Actor, action: str) -> None:
+    if str(user.get("id")) == str(actor.user_id):
+        raise HTTPException(status_code=422, detail=f"Admin cannot {action} their own active session")
+    if user.get("username") == settings.bootstrap_admin_username:
+        raise HTTPException(status_code=422, detail=f"Bootstrap admin account cannot be {action}d")
+    if normalize_role(user.get("role")) == "ADMIN" and bool(user.get("is_active", 1)):
+        active_admin_count = conn.execute(
+            "SELECT COUNT(*) FROM users WHERE UPPER(role) = 'ADMIN' AND is_active = 1"
+        ).fetchone()[0]
+        if active_admin_count <= 1:
+            raise HTTPException(status_code=422, detail=f"Cannot {action} the last active ADMIN account")
+
+
 def _display_token_from_request(request: Request) -> str:
     return request.headers.get("x-nms-display-token") or request.query_params.get("token") or ""
 
@@ -943,15 +963,12 @@ def reset_user_password(user_id: int, payload: PasswordResetPayload, actor: Acto
         return {"status": "password_reset"}
 
 
-@app.delete("/api/users/{user_id}")
-def disable_user(user_id: int, actor: Actor = Depends(get_actor)) -> dict[str, str]:
+@app.post("/api/users/{user_id}/deactivate")
+def deactivate_user(user_id: int, actor: Actor = Depends(get_actor)) -> dict[str, str]:
     require_admin(actor)
-    if str(user_id) == str(actor.user_id):
-        raise HTTPException(status_code=422, detail="Admin cannot disable their own active session")
     with transaction() as conn:
-        before = row_to_dict(conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone())
-        if not before:
-            raise HTTPException(status_code=404, detail="User not found")
+        before = _get_user_or_404(conn, user_id)
+        _guard_user_removal(conn, before, actor, "deactivate")
         conn.execute(
             "UPDATE users SET is_active = 0, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (actor.username, user_id),
@@ -970,6 +987,27 @@ def disable_user(user_id: int, actor: Actor = Depends(get_actor)) -> dict[str, s
             changed=changed_fields(before_public, after_public),
         )
         return {"status": "disabled"}
+
+
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: int, actor: Actor = Depends(get_actor)) -> dict[str, str]:
+    require_admin(actor)
+    with transaction() as conn:
+        before = _get_user_or_404(conn, user_id)
+        _guard_user_removal(conn, before, actor, "delete")
+        before_public = _public_user(before) or {}
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        write_audit_log(
+            conn,
+            actor,
+            "DELETE",
+            "USER",
+            entity_id=user_id,
+            before_data=before_public,
+            after_data={"id": user_id, "deleted": True},
+            changed={"deleted": {"before": False, "after": True}},
+        )
+        return {"status": "deleted"}
 
 
 @app.get("/api/audit-logs")

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { KeyRound, Plus, Save, Trash2, UserRound } from "lucide-react";
+import { KeyRound, Plus, Save, Trash2, UserRound, UserX } from "lucide-react";
 import { api } from "../api.js";
 import AdminLayout from "../components/AdminLayout.jsx";
 
@@ -120,10 +120,31 @@ export default function UserAdminPage() {
     }
   }
 
-  async function disable(user) {
+  async function deactivate(user) {
+    if (!window.confirm(`Deactivate account "${user.username}"? The user will not be able to log in.`)) {
+      return;
+    }
+    try {
+      await api(`/users/${user.id}/deactivate`, { method: "POST" });
+      await load();
+      if (selected?.id === user.id) {
+        startCreate();
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function deleteUser(user) {
+    if (!window.confirm(`Permanently delete account "${user.username}"? This cannot be undone.`)) {
+      return;
+    }
     try {
       await api(`/users/${user.id}`, { method: "DELETE" });
       await load();
+      if (selected?.id === user.id) {
+        startCreate();
+      }
     } catch (err) {
       setError(err.message);
     }
@@ -164,7 +185,10 @@ export default function UserAdminPage() {
                   <td className="px-3 py-2 tabular-nums">{user.last_login_at || "-"}</td>
                   <td className="px-3 py-2 tabular-nums">{user.last_login_ip || "-"}</td>
                   <td className="px-3 py-2 text-right" onClick={(event) => event.stopPropagation()}>
-                    <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white text-red-700" title="Disable" onClick={() => disable(user)}>
+                    <button className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white text-amber-700 disabled:cursor-not-allowed disabled:opacity-40" title="Deactivate" disabled={!user.is_active} onClick={() => deactivate(user)}>
+                      <UserX size={14} />
+                    </button>
+                    <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white text-red-700" title="Delete account" onClick={() => deleteUser(user)}>
                       <Trash2 size={14} />
                     </button>
                   </td>

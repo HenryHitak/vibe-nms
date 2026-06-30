@@ -350,8 +350,11 @@ GET /api/users
 POST /api/users
 PUT /api/users/{id}
 POST /api/users/{id}/reset-password
+POST /api/users/{id}/deactivate
 DELETE /api/users/{id}
 ```
+
+`POST /api/users/{id}/deactivate` keeps the account history but blocks login. `DELETE /api/users/{id}` permanently deletes the account row. The backend blocks deleting/deactivating your own active session, the bootstrap admin account, or the last active ADMIN account.
 
 Change `NMS_BOOTSTRAP_ADMIN_PASSWORD` before production deployment.
 
