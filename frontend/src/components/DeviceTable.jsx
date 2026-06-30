@@ -1,8 +1,8 @@
 import { useState } from "react";
 import StatusBadge from "./StatusBadge.jsx";
 
-const PREVIEW_WIDTH = 540;
-const PREVIEW_HEIGHT = 380;
+const PREVIEW_WIDTH = 820;
+const PREVIEW_HEIGHT = 460;
 const PREVIEW_OFFSET = 18;
 const PREVIEW_PADDING = 16;
 
@@ -39,9 +39,9 @@ function previewPosition(event) {
 
 function PreviewField({ label, value }) {
   return (
-    <div className="flex min-w-0 items-center justify-between gap-2 border-b border-slate-200 py-1 last:border-b-0">
-      <div className="shrink-0 text-[10px] font-semibold uppercase tracking-normal text-slate-500">{label}</div>
-      <div className="min-w-0 truncate text-right text-[11px] font-semibold text-ink">{valueOrDash(value)}</div>
+    <div className="grid min-w-0 grid-cols-[64px_minmax(0,1fr)] gap-2 border-b border-slate-200 py-1 last:border-b-0">
+      <div className="text-[10px] font-semibold uppercase tracking-normal text-slate-500">{label}</div>
+      <div className="min-w-0 break-words text-left text-[11px] font-semibold leading-snug text-ink">{valueOrDash(value)}</div>
     </div>
   );
 }
@@ -50,7 +50,7 @@ function PreviewSection({ title, children }) {
   return (
     <section>
       <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-normal text-slate-500">{title}</h3>
-      <div className="grid grid-cols-2 gap-x-3 rounded-md border border-line bg-slate-50 px-3">
+      <div className="rounded-md border border-line bg-slate-50 px-3">
         {children}
       </div>
     </section>
@@ -64,20 +64,20 @@ function DeviceHoverPreview({ device, position }) {
 
   return (
     <div
-      className="pointer-events-none fixed z-30 w-[540px] max-w-[calc(100vw-32px)] rounded-md border border-line bg-white p-4 text-left shadow-2xl"
+      className="pointer-events-none fixed z-30 w-[820px] max-w-[calc(100vw-32px)] rounded-md border border-line bg-white p-4 text-left shadow-2xl"
       style={{ left: position.left, top: position.top }}
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[11px] font-semibold uppercase tracking-normal text-slate-500">Device Preview</div>
-          <div className="truncate text-base font-semibold text-ink">{valueOrDash(device.device_name)}</div>
-          <div className="truncate text-xs text-slate-500">{valueOrDash(device.ip_address)}</div>
+          <div className="break-words text-base font-semibold leading-tight text-ink">{valueOrDash(device.device_name)}</div>
+          <div className="break-words text-xs text-slate-500">{valueOrDash(device.ip_address)}</div>
         </div>
         <StatusBadge status={device.status} />
       </div>
 
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <PreviewSection title="Network">
             <PreviewField label="IP" value={device.ip_address} />
             <PreviewField label="MAC" value={device.mac_address} />
@@ -119,7 +119,7 @@ function DeviceHoverPreview({ device, position }) {
 
         <div className="rounded-md border border-line bg-slate-50 px-3 py-2">
           <div className="text-[11px] font-semibold uppercase tracking-normal text-slate-500">Notes</div>
-          <div className="line-clamp-1 text-xs font-medium text-ink">{valueOrDash(device.notes)}</div>
+          <div className="break-words text-xs font-medium leading-snug text-ink">{valueOrDash(device.notes)}</div>
         </div>
       </div>
     </div>
