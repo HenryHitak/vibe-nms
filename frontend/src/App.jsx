@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Activity,
   BellRing,
   Database,
   FileDown,
@@ -34,6 +35,7 @@ import ExcelImportPage from "./pages/ExcelImportPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import MonitoringLogPage from "./pages/MonitoringLogPage.jsx";
 import SystemSettingsPage from "./pages/SystemSettingsPage.jsx";
+import TrafficGraphPage from "./pages/TrafficGraphPage.jsx";
 import UserAdminPage from "./pages/UserAdminPage.jsx";
 
 const ADMIN_ROUTES = [
@@ -70,6 +72,7 @@ function AuthenticatedApp() {
   const routes = useMemo(() => {
     const base = [
       { key: "dashboard", label: "Dashboard", icon: Gauge, page: DashboardPage },
+      { key: "traffic", label: "Traffic Graphs", icon: Activity, page: TrafficGraphPage },
       { key: "alerts", label: "Alert Center", icon: BellRing, page: AlertCenter },
       { key: "ap-clients", label: "AP Clients", icon: Wifi, page: APClientDiscoveryPage }
     ];
@@ -197,7 +200,7 @@ function AuthenticatedApp() {
           {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
         </button>
         <nav className="space-y-1">
-          {routes.slice(0, 3).map(navButton)}
+          {routes.slice(0, 4).map(navButton)}
         </nav>
         {role === "ADMIN" ? (
           <>

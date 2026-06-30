@@ -133,5 +133,34 @@ Ping monitoring과 AP Client Discovery는 서로 다른 worker입니다.
 | --- | --- | --- |
 | Ping monitoring worker | 등록된 모든 IP | 장치 reachability 확인 |
 | AP Client Discovery worker | Device Type=AP, Monitoring Enabled=ON | AP별 무선 Client 확인 |
+| Traffic collection worker | Monitoring Enabled=ON 장치 | TX/RX traffic snapshot 저장 |
 
 AP Client Discovery는 Cisco WLC, Meraki, Aruba, UniFi, SNMP, Generic API, Demo provider 구조를 사용합니다.
+
+## 8. Traffic 수집 방식
+
+Traffic Graphs는 Ping 결과가 아니라 별도 `network_traffic_metrics` 데이터를 사용합니다.
+
+```mermaid
+flowchart TD
+    Timer["NMS_TRAFFIC_COLLECTION_INTERVAL_SECONDS"] --> Load["Load monitoring-enabled devices"]
+    Load --> Provider["Select traffic provider"]
+    Provider --> Source["Demo / Generic API / Cisco WLC / SNMP"]
+    Source --> Snapshot["Collect RX bps and TX bps"]
+    Snapshot --> Rollup["Calculate min / avg / max"]
+    Rollup --> Store["Insert network_traffic_metrics"]
+    Store --> API["GET /api/traffic/summary"]
+    API --> UI["Traffic Graphs tab"]
+```
+
+기본값:
+
+```text
+NMS_TRAFFIC_COLLECTION_ENABLED=true
+NMS_TRAFFIC_COLLECTION_INTERVAL_SECONDS=60
+NMS_TRAFFIC_DEFAULT_PROVIDER=demo
+NMS_TRAFFIC_GENERIC_API_URL=
+NMS_TRAFFIC_GENERIC_API_TOKEN=
+```
+
+`demo` provider는 UI 확인용입니다. 실제 traffic은 Cisco Controller, SNMP, 또는 사내 collector API에서 백엔드가 가져와야 합니다.

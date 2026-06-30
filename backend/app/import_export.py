@@ -511,6 +511,7 @@ def migration_payload(conn: sqlite3.Connection) -> dict[str, Any]:
         "export_jobs",
         "monitoring_runs",
         "device_metrics",
+        "network_traffic_metrics",
         "alerts",
         "notifications",
         "system_settings",

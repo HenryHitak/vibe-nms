@@ -14,16 +14,20 @@ flowchart LR
     Backend --> Frontend["React Frontend<br/>served by backend"]
     Backend --> PingWorker["Ping Monitoring Worker"]
     Backend --> APWorker["ap_client_discovery_worker.py"]
+    Backend --> TrafficWorker["traffic_monitoring_worker.py"]
 
     PingWorker --> DeviceIPs["Registered Device IPs"]
     APWorker --> APProviders["AP Client Providers<br/>Cisco WLC, Meraki, Aruba, UniFi, SNMP, Demo"]
+    TrafficWorker --> TrafficProviders["Traffic Providers<br/>Demo, Generic API, Cisco WLC, SNMP"]
     APProviders --> Controller["Wireless Controller"]
     Controller --> APs["Registered Access Points"]
     APs --> Clients["Connected Wireless Clients"]
 
     PingWorker --> Alerts["Alerts + Notifications"]
     APWorker --> Alerts
+    TrafficWorker --> TrafficDB["network_traffic_metrics"]
     Alerts --> Backend
+    TrafficDB --> Backend
 ```
 
 ## 2. Windows 설치 후 실행 흐름
@@ -117,3 +121,17 @@ sequenceDiagram
 ```
 
 `/api/display/dashboard`는 읽기 전용입니다. 관리 기능은 일반 로그인 API와 ADMIN 권한이 필요합니다.
+
+## 7. Traffic Graphs 흐름
+
+```mermaid
+flowchart TD
+    Start["Traffic collection timer"] --> Load["Load monitoring-enabled devices"]
+    Load --> Provider["Provider selection"]
+    Provider --> Collect["Collect RX/TX bps"]
+    Collect --> Rollup["Calculate min / avg / max"]
+    Rollup --> Store["network_traffic_metrics"]
+    Store --> Summary["GET /api/traffic/summary"]
+    Summary --> Page["Traffic Graphs tab"]
+    Summary --> Display["Display API traffic block"]
+```

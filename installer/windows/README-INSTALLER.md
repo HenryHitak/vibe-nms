@@ -86,6 +86,18 @@ NMS_TCP_FALLBACK_PORTS=445,3389,80,443
 
 If one fallback port responds, the device is marked `ONLINE` and Monitoring Logs show method `PING+TCP`.
 
+Traffic Graphs:
+
+```text
+NMS_TRAFFIC_COLLECTION_ENABLED=true
+NMS_TRAFFIC_COLLECTION_INTERVAL_SECONDS=60
+NMS_TRAFFIC_DEFAULT_PROVIDER=demo
+NMS_TRAFFIC_GENERIC_API_URL=
+NMS_TRAFFIC_GENERIC_API_TOKEN=
+```
+
+`Traffic Graphs` shows TX/RX current, min, avg, max, trend, and top traffic devices. The default `demo` provider is for UI validation. For production, connect a controller/SNMP/API collector and keep API tokens in backend `.env` only.
+
 Screen timestamps use Mexico/Tijuana by default:
 
 ```text

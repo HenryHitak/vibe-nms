@@ -417,6 +417,24 @@ def init_db() -> None:
                 error_message TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS network_traffic_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id INTEGER NOT NULL REFERENCES network_devices(id) ON DELETE CASCADE,
+                collected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                interface_name TEXT,
+                rx_bps REAL,
+                tx_bps REAL,
+                rx_min_bps REAL,
+                rx_max_bps REAL,
+                rx_avg_bps REAL,
+                tx_min_bps REAL,
+                tx_max_bps REAL,
+                tx_avg_bps REAL,
+                utilization_percent REAL,
+                source TEXT NOT NULL DEFAULT 'demo',
+                raw_data_json TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS alerts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 device_id INTEGER REFERENCES network_devices(id) ON DELETE SET NULL,
@@ -455,6 +473,7 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);
             CREATE INDEX IF NOT EXISTS idx_audit_filters ON audit_logs(actor_username, action_type, entity_type, target_ip_address);
             CREATE INDEX IF NOT EXISTS idx_metrics_device_checked ON device_metrics(device_id, checked_at);
+            CREATE INDEX IF NOT EXISTS idx_traffic_device_collected ON network_traffic_metrics(device_id, collected_at);
             CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status, severity);
             CREATE TABLE IF NOT EXISTS ap_client_discovery_runs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

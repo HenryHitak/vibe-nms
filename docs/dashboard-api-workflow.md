@@ -79,6 +79,7 @@ devices
 recent_alerts
 recent_metrics
 by_ap
+traffic
 ```
 
 일반적으로 다른 화면은 아래 값만 써도 충분합니다.
@@ -90,6 +91,7 @@ by_ap
 | recent_alerts | 최근 Alert banner 또는 list |
 | recent_metrics | trend chart |
 | by_ap | AP별 Client summary |
+| traffic | TX/RX current, min, avg, max, trend, top devices |
 
 ## 5. 인증 방식
 

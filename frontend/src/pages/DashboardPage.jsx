@@ -6,6 +6,14 @@ import AlertBanner from "../components/AlertBanner.jsx";
 import DeviceDetailModal from "../components/DeviceDetailModal.jsx";
 import DeviceTable from "../components/DeviceTable.jsx";
 
+function formatBps(value) {
+  const number = Number(value || 0);
+  if (number >= 1_000_000_000) return `${(number / 1_000_000_000).toFixed(2)} Gbps`;
+  if (number >= 1_000_000) return `${(number / 1_000_000).toFixed(2)} Mbps`;
+  if (number >= 1_000) return `${(number / 1_000).toFixed(1)} Kbps`;
+  return `${number.toFixed(0)} bps`;
+}
+
 function Stat({ icon: Icon, label, value, tone }) {
   const toneClass = {
     green: "text-green-nms",
@@ -28,6 +36,7 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState(null);
   const [devices, setDevices] = useState([]);
   const [apDashboard, setApDashboard] = useState([]);
+  const [traffic, setTraffic] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailDevice, setDetailDevice] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -38,14 +47,16 @@ export default function DashboardPage() {
 
   async function load() {
     try {
-      const [summaryPayload, devicesPayload, apPayload] = await Promise.all([
+      const [summaryPayload, devicesPayload, apPayload, trafficPayload] = await Promise.all([
         api("/dashboard/summary"),
         api("/devices"),
-        api("/dashboard/by-ap")
+        api("/dashboard/by-ap"),
+        api("/traffic/summary?point_limit=120&device_limit=120")
       ]);
       setSummary(summaryPayload);
       setDevices(devicesPayload);
       setApDashboard(apPayload);
+      setTraffic(trafficPayload);
       setError("");
     } catch (err) {
       setError(err.message);
@@ -156,6 +167,31 @@ export default function DashboardPage() {
     [summary, plantFilter, lineFilter]
   );
 
+  const trafficRows = useMemo(
+    () => [...(traffic?.latest || [])]
+      .filter((row) => (!plantFilter || row.plant_name === plantFilter) && (!lineFilter || row.line_name === lineFilter)),
+    [traffic, plantFilter, lineFilter]
+  );
+
+  const trafficOverview = useMemo(() => {
+    const totals = trafficRows.reduce((acc, row) => {
+      const rx = Number(row.rx_bps || 0);
+      const tx = Number(row.tx_bps || 0);
+      acc.rx += rx;
+      acc.tx += tx;
+      if (rx + tx > acc.peakTotal) {
+        acc.peakTotal = rx + tx;
+        acc.peakDevice = row.device_name;
+      }
+      return acc;
+    }, { rx: 0, tx: 0, peakTotal: 0, peakDevice: "-" });
+    return {
+      ...totals,
+      count: trafficRows.length,
+      source: Object.entries(traffic?.summary?.source_counts || {}).map(([source, count]) => `${source}: ${count}`).join(" / ")
+    };
+  }, [trafficRows, traffic]);
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <AlertBanner alerts={summary?.recent_alerts || []} />
@@ -188,6 +224,37 @@ export default function DashboardPage() {
           <Stat icon={AlertTriangle} label="Warning" value={(counts.WARNING || 0) + (counts.UNCERTAIN || 0) + (counts.FLAPPING || 0)} tone="orange" />
           <Stat icon={ServerCrash} label="Offline / Critical" value={(counts.OFFLINE || 0) + (counts.CRITICAL || 0)} tone="red" />
         </div>
+
+        <section className="mb-5 rounded-md border border-line bg-white p-4 shadow-sm">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Activity size={18} className="text-cyan-700" />
+              <h2 className="font-semibold">Traffic Overview</h2>
+            </div>
+            <button className="h-9 rounded-md border border-line bg-slate-50 px-3 text-sm font-semibold text-slate-700 hover:bg-white" onClick={() => { window.location.hash = "traffic"; }}>
+              Open Traffic Graphs
+            </button>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div className="rounded-md border border-line bg-slate-50 p-3">
+              <div className="text-xs font-semibold uppercase text-slate-500">Current RX</div>
+              <div className="mt-1 text-xl font-semibold tabular-nums text-cyan-700">{formatBps(trafficOverview.rx)}</div>
+            </div>
+            <div className="rounded-md border border-line bg-slate-50 p-3">
+              <div className="text-xs font-semibold uppercase text-slate-500">Current TX</div>
+              <div className="mt-1 text-xl font-semibold tabular-nums text-orange-700">{formatBps(trafficOverview.tx)}</div>
+            </div>
+            <div className="rounded-md border border-line bg-slate-50 p-3">
+              <div className="text-xs font-semibold uppercase text-slate-500">Peak Device</div>
+              <div className="mt-1 truncate text-xl font-semibold text-ink">{trafficOverview.peakDevice}</div>
+            </div>
+            <div className="rounded-md border border-line bg-slate-50 p-3">
+              <div className="text-xs font-semibold uppercase text-slate-500">Traffic Source</div>
+              <div className="mt-1 truncate text-sm font-semibold text-ink">{trafficOverview.source || "No data"}</div>
+              <div className="text-xs text-slate-500">{trafficOverview.count} devices</div>
+            </div>
+          </div>
+        </section>
 
         <section className="mb-5 rounded-md border border-line bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">

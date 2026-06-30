@@ -11,6 +11,8 @@
 - [Monitoring Workflow](./monitoring-workflow.md): 등록된 IP를 계속 모니터링하는 방식과 상태 판정 기준
 - [Dashboard API Workflow](./dashboard-api-workflow.md): 다른 화면, TV, 사내 페이지에서 대시보드를 보여주는 API 방식
 
+Traffic Graphs는 TX/RX current, min, avg, max, trend, top devices를 보여줍니다. 브라우저가 traffic을 직접 수집하지 않고, 백엔드 traffic collector가 `network_traffic_metrics`에 저장한 값을 API로 표시합니다.
+
 ## 기준 용어
 
 - 서버 PC: Vibe NMS가 설치되어 실제 백엔드가 실행되는 PC 또는 서버

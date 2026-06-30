@@ -105,6 +105,34 @@ DELETE /api/access-points/{ap_id}/registered-clients/{device_id}
 
 Deleting a registered AP client soft-deletes the underlying Device Master row and writes an audit log.
 
+## Traffic Graphs
+
+`Traffic Graphs` shows TX/RX traffic by device, Plant, and Line.
+
+It includes:
+
+- Current RX and TX
+- RX min / avg / max
+- TX min / avg / max
+- TX/RX trend graph
+- Top traffic devices
+- Latest interface traffic table with Device, IP, AP, Switch, interface, source, and last collected time
+
+The browser does not collect traffic directly. The backend traffic collector writes snapshots to `network_traffic_metrics`, and the UI reads them from:
+
+```text
+GET /api/traffic/summary
+POST /api/traffic/run
+```
+
+MVP default provider:
+
+```text
+NMS_TRAFFIC_DEFAULT_PROVIDER=demo
+```
+
+The demo provider is for UI validation. For production, use a backend-only controller/SNMP/API source and keep tokens in `.env`, not in the frontend.
+
 ## Windows Installer Without Docker
 
 You can run Vibe NMS without Docker on a Windows PC or Windows Server.
@@ -365,6 +393,11 @@ NMS_TCP_FALLBACK_PORTS=445,3389,80,443
 NMS_WARNING_LATENCY_MS=150
 NMS_CRITICAL_LATENCY_MS=500
 NMS_WARNING_PACKET_LOSS_PERCENT=5
+NMS_TRAFFIC_COLLECTION_ENABLED=true
+NMS_TRAFFIC_COLLECTION_INTERVAL_SECONDS=60
+NMS_TRAFFIC_DEFAULT_PROVIDER=demo
+NMS_TRAFFIC_GENERIC_API_URL=
+NMS_TRAFFIC_GENERIC_API_TOKEN=
 NMS_DEFAULT_ROLE=USER
 NMS_SEED_SAMPLE_DATA=true
 NMS_AUTH_SECRET=change-this-to-a-long-random-secret

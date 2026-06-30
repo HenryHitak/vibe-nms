@@ -51,6 +51,7 @@ from .schemas import (
     UserUpdatePayload,
 )
 from .security import Actor, actor_from_request, require_admin
+from .traffic_monitoring_worker import traffic_collection_loop, run_traffic_collection_cycle
 from .timezone import local_datetime_filter_to_utc_storage
 from .validation import VALID_CRITICALITY, VALID_DEVICE_TYPES, normalize_upper, validate_ip, validate_mac
 
@@ -59,11 +60,13 @@ collector_stop_event: asyncio.Event | None = None
 collector_task: asyncio.Task | None = None
 ap_discovery_stop_event: asyncio.Event | None = None
 ap_discovery_task: asyncio.Task | None = None
+traffic_stop_event: asyncio.Event | None = None
+traffic_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    global collector_stop_event, collector_task, ap_discovery_stop_event, ap_discovery_task
+    global collector_stop_event, collector_task, ap_discovery_stop_event, ap_discovery_task, traffic_stop_event, traffic_task
     init_db()
     if settings.collector_enabled:
         collector_stop_event = asyncio.Event()
@@ -71,15 +74,22 @@ async def lifespan(_app: FastAPI):
     if settings.ap_client_discovery_enabled:
         ap_discovery_stop_event = asyncio.Event()
         ap_discovery_task = asyncio.create_task(ap_client_discovery_loop(ap_discovery_stop_event))
+    if settings.traffic_collection_enabled:
+        traffic_stop_event = asyncio.Event()
+        traffic_task = asyncio.create_task(traffic_collection_loop(traffic_stop_event))
     yield
     if collector_stop_event:
         collector_stop_event.set()
     if ap_discovery_stop_event:
         ap_discovery_stop_event.set()
+    if traffic_stop_event:
+        traffic_stop_event.set()
     if collector_task:
         await collector_task
     if ap_discovery_task:
         await ap_discovery_task
+    if traffic_task:
+        await traffic_task
 
 
 app = FastAPI(title=settings.app_name, version="1.0.0", lifespan=lifespan)
@@ -424,6 +434,142 @@ def _device_filter_clauses(filters: dict[str, Any], alias: str = "d", include_de
     return clauses, params
 
 
+def _number(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _traffic_bucket(value: Any) -> str:
+    if hasattr(value, "isoformat"):
+        text = value.isoformat(sep=" ")
+    else:
+        text = str(value or "")
+    text = text.replace("T", " ")
+    return text[:16] if len(text) >= 16 else text
+
+
+def _traffic_filter_clauses(filters: dict[str, Any]) -> tuple[list[str], list[Any]]:
+    clauses, params = _device_filter_clauses(filters)
+    if filters.get("device_id"):
+        clauses.append("d.id = ?")
+        params.append(int(filters["device_id"]))
+    return clauses, params
+
+
+def _traffic_summary_payload(conn: sqlite3.Connection, filters: dict[str, Any]) -> dict[str, Any]:
+    point_limit = min(max(int(filters.get("point_limit") or 240), 10), 2000)
+    device_limit = min(max(int(filters.get("device_limit") or 200), 1), 1000)
+    clauses, params = _traffic_filter_clauses(filters)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    latest_rows = rows_to_dicts(
+        conn.execute(
+            f"""
+            SELECT *
+            FROM (
+                SELECT t.id, t.device_id, t.collected_at, t.interface_name,
+                       t.rx_bps, t.tx_bps, t.rx_min_bps, t.rx_max_bps, t.rx_avg_bps,
+                       t.tx_min_bps, t.tx_max_bps, t.tx_avg_bps, t.utilization_percent,
+                       t.source, t.raw_data_json,
+                       d.device_name, d.device_type, d.ip_address,
+                       COALESCE(d.plant_name, d.plant_code) AS plant_name,
+                       COALESCE(d.line_name, d.line_code) AS line_name,
+                       d.connected_ap_name, d.connected_ap_ip, d.switch_name, d.switch_port,
+                       ROW_NUMBER() OVER (PARTITION BY t.device_id ORDER BY t.collected_at DESC, t.id DESC) AS rn
+                FROM network_traffic_metrics t
+                JOIN network_devices d ON d.id = t.device_id
+                {where}
+            ) ranked
+            WHERE rn = 1
+            ORDER BY COALESCE(rx_bps, 0) + COALESCE(tx_bps, 0) DESC, device_name
+            LIMIT ?
+            """,
+            params + [device_limit],
+        ).fetchall()
+    )
+    recent_rows = rows_to_dicts(
+        conn.execute(
+            f"""
+            SELECT t.id, t.device_id, t.collected_at, t.interface_name,
+                   t.rx_bps, t.tx_bps, t.rx_min_bps, t.rx_max_bps, t.rx_avg_bps,
+                   t.tx_min_bps, t.tx_max_bps, t.tx_avg_bps, t.utilization_percent,
+                   t.source,
+                   d.device_name, d.device_type, d.ip_address,
+                   COALESCE(d.plant_name, d.plant_code) AS plant_name,
+                   COALESCE(d.line_name, d.line_code) AS line_name,
+                   d.connected_ap_name, d.connected_ap_ip, d.switch_name, d.switch_port
+            FROM network_traffic_metrics t
+            JOIN network_devices d ON d.id = t.device_id
+            {where}
+            ORDER BY t.collected_at DESC, t.id DESC
+            LIMIT ?
+            """,
+            params + [point_limit],
+        ).fetchall()
+    )
+    buckets: dict[str, dict[str, Any]] = {}
+    for row in reversed(recent_rows):
+        bucket = _traffic_bucket(row.get("collected_at"))
+        if not bucket:
+            continue
+        item = buckets.setdefault(
+            bucket,
+            {
+                "time": bucket,
+                "rx_bps": 0.0,
+                "tx_bps": 0.0,
+                "rx_max_bps": 0.0,
+                "tx_max_bps": 0.0,
+                "sample_count": 0,
+            },
+        )
+        rx = _number(row.get("rx_bps")) or 0.0
+        tx = _number(row.get("tx_bps")) or 0.0
+        item["rx_bps"] += rx
+        item["tx_bps"] += tx
+        item["rx_max_bps"] = max(item["rx_max_bps"], _number(row.get("rx_max_bps")) or rx)
+        item["tx_max_bps"] = max(item["tx_max_bps"], _number(row.get("tx_max_bps")) or tx)
+        item["sample_count"] += 1
+    current_rx_values = [_number(row.get("rx_bps")) for row in latest_rows]
+    current_tx_values = [_number(row.get("tx_bps")) for row in latest_rows]
+    latest_times = [str(row.get("collected_at")) for row in latest_rows if row.get("collected_at")]
+    source_counts: dict[str, int] = {}
+    for row in latest_rows:
+        source = row.get("source") or "unknown"
+        source_counts[source] = source_counts.get(source, 0) + 1
+    return {
+        "filters": {
+            "plant": filters.get("plant"),
+            "line": filters.get("line"),
+            "device_id": filters.get("device_id"),
+            "point_limit": point_limit,
+            "device_limit": device_limit,
+        },
+        "settings": {
+            "traffic_collection_enabled": settings.traffic_collection_enabled,
+            "traffic_collection_interval_seconds": settings.traffic_collection_interval_seconds,
+            "traffic_default_provider": settings.traffic_default_provider,
+        },
+        "summary": {
+            "device_count": len(latest_rows),
+            "current_rx_bps": round(sum(value or 0 for value in current_rx_values), 2),
+            "current_tx_bps": round(sum(value or 0 for value in current_tx_values), 2),
+            "max_rx_bps": max([value or 0 for value in current_rx_values], default=0),
+            "max_tx_bps": max([value or 0 for value in current_tx_values], default=0),
+            "avg_rx_bps": round(sum(value or 0 for value in current_rx_values) / len(latest_rows), 2) if latest_rows else 0,
+            "avg_tx_bps": round(sum(value or 0 for value in current_tx_values) / len(latest_rows), 2) if latest_rows else 0,
+            "last_collected_at": max(latest_times) if latest_times else None,
+            "source_counts": source_counts,
+        },
+        "timeseries": list(buckets.values()),
+        "latest": latest_rows,
+        "top_devices": latest_rows[:10],
+    }
+
+
 def _dashboard_display_payload(conn: sqlite3.Connection, filters: dict[str, Any]) -> dict[str, Any]:
     device_clauses, device_params = _device_filter_clauses(filters)
     device_where = f"WHERE {' AND '.join(device_clauses)}" if device_clauses else ""
@@ -585,6 +731,16 @@ def _dashboard_display_payload(conn: sqlite3.Connection, filters: dict[str, Any]
         "devices": devices,
         "recent_alerts": recent_alerts,
         "recent_metrics": recent_metrics,
+        "traffic": _traffic_summary_payload(
+            conn,
+            {
+                "plant": filters.get("plant"),
+                "line": filters.get("line"),
+                "status": filters.get("status"),
+                "point_limit": metric_limit,
+                "device_limit": device_limit,
+            },
+        ),
         "by_ap": by_ap,
     }
 
@@ -638,6 +794,9 @@ def backend_runtime(actor: Actor = Depends(get_actor)) -> dict[str, Any]:
             "tcp_fallback_ports": settings.tcp_fallback_ports,
             "ap_client_discovery_enabled": settings.ap_client_discovery_enabled,
             "ap_client_discovery_interval_seconds": settings.ap_client_discovery_interval_seconds,
+            "traffic_collection_enabled": settings.traffic_collection_enabled,
+            "traffic_collection_interval_seconds": settings.traffic_collection_interval_seconds,
+            "traffic_default_provider": settings.traffic_default_provider,
         },
         "api": {
             "docs": "/docs",
@@ -645,6 +804,7 @@ def backend_runtime(actor: Actor = Depends(get_actor)) -> dict[str, Any]:
             "dashboard_post": "/api/display/dashboard",
             "display_page": "/display",
             "database_config": "/api/database/config",
+            "traffic_summary": "/api/traffic/summary",
         },
     }
 
@@ -948,6 +1108,33 @@ def dashboard_summary() -> dict[str, Any]:
             "recent_alerts": recent_alerts,
             "recent_metrics": recent_metrics,
         }
+
+
+@app.get("/api/traffic/summary")
+def traffic_summary(
+    plant: str | None = None,
+    line: str | None = None,
+    device_id: int | None = None,
+    point_limit: int = Query(240, ge=10, le=2000),
+    device_limit: int = Query(200, ge=1, le=1000),
+) -> dict[str, Any]:
+    with transaction() as conn:
+        return _traffic_summary_payload(
+            conn,
+            {
+                "plant": plant,
+                "line": line,
+                "device_id": device_id,
+                "point_limit": point_limit,
+                "device_limit": device_limit,
+            },
+        )
+
+
+@app.post("/api/traffic/run")
+async def run_traffic_collection_once(actor: Actor = Depends(get_actor)) -> dict[str, int]:
+    require_admin(actor)
+    return await run_traffic_collection_cycle()
 
 
 @app.get("/api/devices")

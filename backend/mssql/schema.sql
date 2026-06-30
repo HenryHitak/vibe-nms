@@ -201,6 +201,29 @@ BEGIN
 END
 GO
 
+IF OBJECT_ID(N'dbo.network_traffic_metrics', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.network_traffic_metrics (
+        id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        device_id INT NOT NULL,
+        collected_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+        interface_name NVARCHAR(120) NULL,
+        rx_bps FLOAT NULL,
+        tx_bps FLOAT NULL,
+        rx_min_bps FLOAT NULL,
+        rx_max_bps FLOAT NULL,
+        rx_avg_bps FLOAT NULL,
+        tx_min_bps FLOAT NULL,
+        tx_max_bps FLOAT NULL,
+        tx_avg_bps FLOAT NULL,
+        utilization_percent FLOAT NULL,
+        source NVARCHAR(80) NOT NULL DEFAULT N'demo',
+        raw_data_json NVARCHAR(MAX) NULL,
+        CONSTRAINT fk_network_traffic_metrics_network_devices FOREIGN KEY(device_id) REFERENCES dbo.network_devices(id) ON DELETE CASCADE
+    );
+END
+GO
+
 IF OBJECT_ID(N'dbo.alerts', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.alerts (
@@ -328,6 +351,8 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_audit_filters')
     CREATE INDEX idx_audit_filters ON dbo.audit_logs(actor_username, action_type, entity_type, target_ip_address);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_metrics_device_checked')
     CREATE INDEX idx_metrics_device_checked ON dbo.device_metrics(device_id, checked_at);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_traffic_device_collected')
+    CREATE INDEX idx_traffic_device_collected ON dbo.network_traffic_metrics(device_id, collected_at);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_alerts_status')
     CREATE INDEX idx_alerts_status ON dbo.alerts(status, severity);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_ap_obs_ap_seen')
