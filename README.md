@@ -101,10 +101,10 @@ Do not use GitHub `Code > Download ZIP` as the installer. Use the release asset 
 On the target PC, extract `vibe-nms-windows-installer.zip` and run the root file:
 
 ```text
-Install Vibe NMS.cmd
+Install Vibe NMS.exe
 ```
 
-Do not double-click `.ps1` files. On some company PCs they open in Notepad; the `.cmd` wrapper handles PowerShell and administrator permission automatically.
+Do not double-click `.ps1` files. On some company PCs they open in VS Code or Notepad. The `.exe` launcher handles PowerShell and administrator permission automatically.
 
 Open:
 

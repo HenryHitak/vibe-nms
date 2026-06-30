@@ -5,6 +5,8 @@ $frontendDir = Join-Path $root "frontend"
 $backendDir = Join-Path $root "backend"
 $packageDir = Join-Path $root "vibe-nms-windows-installer"
 $zipPath = Join-Path $root "vibe-nms-windows-installer.zip"
+$launcherSource = Join-Path $root "installer\windows\bootstrapper\VibeNmsInstallerLauncher.cs"
+$launcherBuildDir = Join-Path $root "installer\windows\bootstrapper\bin"
 
 if (Test-Path $packageDir) {
     Remove-Item -LiteralPath $packageDir -Recurse -Force
@@ -67,41 +69,30 @@ Copy-Item -LiteralPath (Join-Path $root "installer\windows\uninstall.ps1") -Dest
 Copy-Item -LiteralPath (Join-Path $root "installer\windows\service\run-vibe-nms.ps1") -Destination (Join-Path $packageDir "service\run-vibe-nms.ps1") -Force
 Copy-Item -LiteralPath (Join-Path $root "installer\windows\README-INSTALLER.md") -Destination (Join-Path $packageDir "README-INSTALLER.md") -Force
 
-@'
-@echo off
-setlocal
-
-net session >nul 2>&1
-if not "%errorlevel%"=="0" (
-    echo Requesting administrator permission...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
-    exit /b
-)
-
-cd /d "%~dp0"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\install.ps1"
-
-echo.
-pause
-'@ | Set-Content -LiteralPath (Join-Path $packageDir "Install Vibe NMS.cmd") -Encoding ASCII
-
-@'
-@echo off
-setlocal
-
-net session >nul 2>&1
-if not "%errorlevel%"=="0" (
-    echo Requesting administrator permission...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
-    exit /b
-)
-
-cd /d "%~dp0"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\uninstall.ps1"
-
-echo.
-pause
-'@ | Set-Content -LiteralPath (Join-Path $packageDir "Uninstall Vibe NMS.cmd") -Encoding ASCII
+Write-Host "Building Windows installer launchers..."
+$csc = (Get-Command csc.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+if (-not $csc) {
+    $candidates = @(
+        "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
+        "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe",
+        "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\Roslyn\csc.exe"
+    )
+    $csc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+}
+if (-not $csc) {
+    throw "Cannot find csc.exe to build installer launchers."
+}
+if (Test-Path $launcherBuildDir) {
+    Remove-Item -LiteralPath $launcherBuildDir -Recurse -Force
+}
+New-Item -ItemType Directory -Path $launcherBuildDir | Out-Null
+$launcherExe = Join-Path $launcherBuildDir "VibeNmsInstallerLauncher.exe"
+& $csc /nologo /target:exe /platform:anycpu /out:$launcherExe $launcherSource
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to build installer launcher."
+}
+Copy-Item -LiteralPath $launcherExe -Destination (Join-Path $packageDir "Install Vibe NMS.exe") -Force
+Copy-Item -LiteralPath $launcherExe -Destination (Join-Path $packageDir "Uninstall Vibe NMS.exe") -Force
 
 Compress-Archive -Path (Join-Path $packageDir "*") -DestinationPath $zipPath -Force
 Write-Host "Created $zipPath"

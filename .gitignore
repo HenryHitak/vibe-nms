@@ -17,3 +17,4 @@ vibe-nms-windows-installer.zip
 backend/build/
 backend/dist/
 backend/*.spec
+installer/windows/bootstrapper/bin/

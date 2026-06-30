@@ -9,10 +9,10 @@ Use the GitHub Release asset named `vibe-nms-windows-installer.zip`. Do not use 
 Extract `vibe-nms-windows-installer.zip`, then run the root file:
 
 ```text
-Install Vibe NMS.cmd
+Install Vibe NMS.exe
 ```
 
-If Windows asks for administrator permission, approve it. Do not double-click `.ps1` files; on some company PCs those files open in Notepad.
+If Windows asks for administrator permission, approve it. Do not double-click `.ps1` files; on some company PCs those files open in VS Code or Notepad.
 
 Open:
 
@@ -69,7 +69,7 @@ Start-ScheduledTask -TaskName VibeNMS
 Run:
 
 ```text
-Uninstall Vibe NMS.cmd
+Uninstall Vibe NMS.exe
 ```
 
 Advanced option, keep data during uninstall:
