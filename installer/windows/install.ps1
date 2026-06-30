@@ -61,12 +61,24 @@ $action = New-ScheduledTaskAction `
     -WorkingDirectory $InstallDir
 $startupTrigger = New-ScheduledTaskTrigger -AtStartup
 $logonTrigger = New-ScheduledTaskTrigger -AtLogOn
-$settings = New-ScheduledTaskSettingsSet `
-    -AllowStartIfOnBatteries `
-    -DisallowStartIfOnBatteries:$false `
-    -ExecutionTimeLimit (New-TimeSpan -Days 0) `
-    -RestartCount 3 `
-    -RestartInterval (New-TimeSpan -Minutes 1)
+$settingsCommand = Get-Command New-ScheduledTaskSettingsSet
+$settingsParams = @{}
+if ($settingsCommand.Parameters.ContainsKey("AllowStartIfOnBatteries")) {
+    $settingsParams["AllowStartIfOnBatteries"] = $true
+}
+if ($settingsCommand.Parameters.ContainsKey("DontStopIfGoingOnBatteries")) {
+    $settingsParams["DontStopIfGoingOnBatteries"] = $true
+}
+if ($settingsCommand.Parameters.ContainsKey("ExecutionTimeLimit")) {
+    $settingsParams["ExecutionTimeLimit"] = (New-TimeSpan -Days 0)
+}
+if ($settingsCommand.Parameters.ContainsKey("RestartCount")) {
+    $settingsParams["RestartCount"] = 3
+}
+if ($settingsCommand.Parameters.ContainsKey("RestartInterval")) {
+    $settingsParams["RestartInterval"] = (New-TimeSpan -Minutes 1)
+}
+$settings = New-ScheduledTaskSettingsSet @settingsParams
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger @($startupTrigger, $logonTrigger) -Settings $settings -Principal $principal | Out-Null
 
