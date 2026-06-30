@@ -79,6 +79,16 @@ class BulkSettingsPayload(BaseModel):
     settings: dict[str, Any]
 
 
+class DisplayDashboardRequest(BaseModel):
+    plant: str | None = None
+    line: str | None = None
+    status: str | None = None
+    device_limit: int = Field(200, ge=1, le=1000)
+    alert_limit: int = Field(20, ge=1, le=100)
+    metric_limit: int = Field(60, ge=1, le=500)
+    include_ap: bool = True
+
+
 class LoginRequest(BaseModel):
     username: str
     password: str

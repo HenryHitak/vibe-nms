@@ -246,6 +246,7 @@ NMS_AP_CLIENT_DEFAULT_PROVIDER=demo
 NMS_BOOTSTRAP_ADMIN_USERNAME=admin
 NMS_BOOTSTRAP_ADMIN_PASSWORD=admin
 NMS_AUTH_SECRET=change-this-to-a-long-random-secret
+NMS_DISPLAY_API_TOKEN=
 "@ | Set-Content -LiteralPath $envPath -Encoding UTF8
 } else {
     $envLines = Get-Content -LiteralPath $envPath
@@ -272,6 +273,16 @@ NMS_AUTH_SECRET=change-this-to-a-long-random-secret
         if (-not $found) {
             $envLines += "$key=$value"
         }
+    }
+    $displayTokenExists = $false
+    foreach ($line in $envLines) {
+        if ($line -match "^NMS_DISPLAY_API_TOKEN=") {
+            $displayTokenExists = $true
+            break
+        }
+    }
+    if (-not $displayTokenExists) {
+        $envLines += "NMS_DISPLAY_API_TOKEN="
     }
     $envLines | Set-Content -LiteralPath $envPath -Encoding UTF8
 }

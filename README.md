@@ -125,6 +125,32 @@ Password: admin
 
 The installer registers a Windows Scheduled Task named `VibeNMS` so ping monitoring and AP Client Discovery keep running in the background. Docker and Node.js are not required on the target PC. For production, install it on a PC or server that stays powered on inside the corporate network.
 
+Backend runtime:
+
+```text
+Scheduled Task: VibeNMS
+Runner: C:\Program Files\Vibe NMS\service\run-vibe-nms.ps1
+Backend EXE: C:\Program Files\Vibe NMS\server\vibe-nms-server.exe
+Config: C:\Program Files\Vibe NMS\.env
+Default URL: http://localhost:8080
+```
+
+Default SQL storage for the Windows installer is SQLite:
+
+```text
+C:\Program Files\Vibe NMS\data\nms.sqlite
+```
+
+If `NMS_DATABASE_ENGINE=mssql` is set in `.env`, SQL runs on the configured MS SQL Server instead:
+
+```text
+NMS_MSSQL_SERVER=your-sql-server
+NMS_MSSQL_PORT=1433
+NMS_MSSQL_DATABASE=vibe_nms
+```
+
+Admins can open `Backend Info` in the app to see the live backend process, database target, worker status, and API paths. The same data is available from `GET /api/backend/runtime` with an ADMIN bearer token.
+
 This package contains:
 
 - FastAPI backend with MS SQL Server storage for deployment and SQLite fallback for local development
@@ -176,6 +202,68 @@ Default bootstrap login:
 Username: admin
 Password: admin
 Role: ADMIN
+```
+
+## External Display Dashboard API
+
+Use this when another PC, TV screen, browser kiosk, or internal web page needs to show the live dashboard without using the admin console.
+
+Display page:
+
+```text
+http://SERVER_IP:8080/display
+```
+
+Optional filters:
+
+```text
+http://SERVER_IP:8080/display?plant=Main%20Plant
+http://SERVER_IP:8080/display?plant=Main%20Plant&line=Assembly%20Line%201
+```
+
+Read-only JSON API:
+
+```text
+GET /api/display/dashboard
+GET /api/display/dashboard?plant=Main%20Plant&line=Assembly%20Line%201
+POST /api/display/dashboard
+```
+
+POST body example:
+
+```json
+{
+  "plant": "Main Plant",
+  "line": "Assembly Line 1",
+  "status": "OFFLINE",
+  "device_limit": 200,
+  "alert_limit": 20,
+  "metric_limit": 60,
+  "include_ap": true
+}
+```
+
+Response includes:
+
+```text
+summary.status_counts
+devices
+recent_alerts
+recent_metrics
+by_ap
+```
+
+Security:
+
+```text
+NMS_DISPLAY_API_TOKEN=
+```
+
+If `NMS_DISPLAY_API_TOKEN` is empty, the display API is open as read-only on the internal network. If a token is set, call it with one of:
+
+```text
+GET /api/display/dashboard?token=YOUR_TOKEN
+X-NMS-Display-Token: YOUR_TOKEN
 ```
 
 ## Docker Compose Deployment

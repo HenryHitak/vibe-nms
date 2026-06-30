@@ -70,6 +70,7 @@ class Settings:
     seed_sample_data = _bool(os.getenv("NMS_SEED_SAMPLE_DATA"), True)
     auth_secret = os.getenv("NMS_AUTH_SECRET", "change-this-local-development-secret")
     token_ttl_minutes = int(os.getenv("NMS_TOKEN_TTL_MINUTES", "720"))
+    display_api_token = os.getenv("NMS_DISPLAY_API_TOKEN", "")
     bootstrap_admin_username = os.getenv("NMS_BOOTSTRAP_ADMIN_USERNAME", "admin")
     bootstrap_admin_password = os.getenv("NMS_BOOTSTRAP_ADMIN_PASSWORD", "admin")
     bootstrap_admin_email = os.getenv("NMS_BOOTSTRAP_ADMIN_EMAIL", "admin@example.internal")

@@ -39,6 +39,18 @@ Password: admin
 
 The installer registers a Windows Scheduled Task named `VibeNMS`. It starts on boot and runs the backend collector inside the corporate network.
 
+Backend runtime:
+
+```text
+Scheduled Task: VibeNMS
+Runner: C:\Program Files\Vibe NMS\service\run-vibe-nms.ps1
+Backend EXE: C:\Program Files\Vibe NMS\server\vibe-nms-server.exe
+Config: C:\Program Files\Vibe NMS\.env
+Default SQLite DB: C:\Program Files\Vibe NMS\data\nms.sqlite
+```
+
+Admins can open `Backend Info` in the app to see where the backend and SQL database are running.
+
 ## Configure
 
 Edit:
@@ -86,6 +98,26 @@ NMS_MSSQL_PASSWORD=your-password
 ```
 
 AP controller API tokens also go in `.env`; they are only read by the backend process and are not exposed to the browser.
+
+External display dashboard:
+
+```text
+http://SERVER_IP:8080/display
+GET  /api/display/dashboard
+POST /api/display/dashboard
+```
+
+Optional read-only display API token:
+
+```text
+NMS_DISPLAY_API_TOKEN=
+```
+
+If the token is set, use:
+
+```text
+http://SERVER_IP:8080/display?token=YOUR_TOKEN
+```
 
 After editing `.env`, restart the task:
 

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
+import hmac
 import json
+import os
 import sqlite3
 from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .ap_client_discovery_worker import AP_CLIENT_ALERT_TYPES, ap_client_discovery_loop, run_ap_client_discovery_cycle
@@ -36,6 +39,7 @@ from .schemas import (
     BulkSettingsPayload,
     DevicePatch,
     DevicePayload,
+    DisplayDashboardRequest,
     ImportCommitRequest,
     LoginRequest,
     PasswordResetPayload,
@@ -112,7 +116,13 @@ def _public_user(row: dict[str, Any] | None) -> dict[str, Any] | None:
 @app.middleware("http")
 async def require_login_middleware(request: Request, call_next):
     path = request.url.path
-    if request.method == "OPTIONS" or path == "/health" or path == "/api/auth/login" or not path.startswith("/api"):
+    if (
+        request.method == "OPTIONS"
+        or path == "/health"
+        or path == "/api/auth/login"
+        or path.startswith("/api/display/")
+        or not path.startswith("/api")
+    ):
         return await call_next(request)
     try:
         token = bearer_token_from_request(request)
@@ -197,9 +207,283 @@ def _get_device(conn: sqlite3.Connection, device_id: int) -> dict[str, Any]:
     return row_to_dict(row) or {}
 
 
+def _display_token_from_request(request: Request) -> str:
+    return request.headers.get("x-nms-display-token") or request.query_params.get("token") or ""
+
+
+def _require_display_access(request: Request) -> None:
+    expected_token = settings.display_api_token.strip()
+    if expected_token and not hmac.compare_digest(_display_token_from_request(request), expected_token):
+        raise HTTPException(status_code=401, detail="Display API token required")
+
+
+def _device_filter_clauses(filters: dict[str, Any], alias: str = "d", include_deleted_clause: bool = True) -> tuple[list[str], list[Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if include_deleted_clause:
+        clauses.append(f"{alias}.is_deleted = 0")
+    if filters.get("plant"):
+        clauses.append(f"COALESCE({alias}.plant_name, {alias}.plant_code) = ?")
+        params.append(filters["plant"])
+    if filters.get("line"):
+        clauses.append(f"COALESCE({alias}.line_name, {alias}.line_code) = ?")
+        params.append(filters["line"])
+    if filters.get("status"):
+        clauses.append(f"{alias}.status = ?")
+        params.append(str(filters["status"]).upper())
+    return clauses, params
+
+
+def _dashboard_display_payload(conn: sqlite3.Connection, filters: dict[str, Any]) -> dict[str, Any]:
+    device_clauses, device_params = _device_filter_clauses(filters)
+    device_where = f"WHERE {' AND '.join(device_clauses)}" if device_clauses else ""
+    device_limit = int(filters.get("device_limit") or 200)
+    alert_limit = int(filters.get("alert_limit") or 20)
+    metric_limit = int(filters.get("metric_limit") or 60)
+
+    total_devices = conn.execute(
+        f"SELECT COUNT(*) FROM network_devices d {device_where}",
+        device_params,
+    ).fetchone()[0]
+    status_counts = {
+        row["status"]: row["count"]
+        for row in conn.execute(
+            f"""
+            SELECT d.status, COUNT(*) AS count
+            FROM network_devices d
+            {device_where}
+            GROUP BY d.status
+            """,
+            device_params,
+        ).fetchall()
+    }
+    devices = rows_to_dicts(
+        conn.execute(
+            f"""
+            SELECT d.id, d.device_name, d.device_type, d.ip_address, d.mac_address, d.hostname,
+                   COALESCE(d.plant_name, d.plant_code) AS plant_name,
+                   COALESCE(d.line_name, d.line_code) AS line_name,
+                   d.building, d.floor, d.area, d.zone, d.connected_ap_name, d.connected_ap_ip,
+                   d.switch_name, d.switch_port, d.vlan, d.owner_department, d.criticality,
+                   d.status, d.latency_ms, d.packet_loss_percent, d.consecutive_failure_count,
+                   latest.check_method AS latest_check_method,
+                   latest.error_message AS latest_monitoring_reason,
+                   (SELECT COUNT(*) FROM alerts a WHERE a.device_id = d.id AND a.status = 'ACTIVE') AS active_alert_count
+            FROM network_devices d
+            LEFT JOIN (
+                SELECT device_id, check_method, error_message
+                FROM (
+                    SELECT device_id, check_method, error_message,
+                           ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY checked_at DESC, id DESC) AS rn
+                    FROM device_metrics
+                ) ranked_metrics
+                WHERE rn = 1
+            ) latest ON latest.device_id = d.id
+            {device_where}
+            ORDER BY CASE d.status WHEN 'CRITICAL' THEN 0 WHEN 'OFFLINE' THEN 1 WHEN 'WARNING' THEN 2 WHEN 'FLAPPING' THEN 3 ELSE 4 END,
+                     COALESCE(d.plant_name, d.plant_code), COALESCE(d.line_name, d.line_code), d.device_name
+            LIMIT ?
+            """,
+            device_params + [device_limit],
+        ).fetchall()
+    )
+
+    alert_clauses = ["a.status IN ('ACTIVE', 'ACKNOWLEDGED')"]
+    alert_params: list[Any] = []
+    if filters.get("plant") or filters.get("line") or filters.get("status"):
+        filtered_alert_clauses, filtered_alert_params = _device_filter_clauses(filters)
+        alert_clauses.extend(filtered_alert_clauses)
+        alert_params.extend(filtered_alert_params)
+    alert_where = f"WHERE {' AND '.join(alert_clauses)}"
+    recent_alerts = rows_to_dicts(
+        conn.execute(
+            f"""
+            SELECT a.id, a.severity, a.alert_type, a.message, a.status,
+                   a.first_detected_at AS created_at, a.last_detected_at,
+                   d.device_name, d.ip_address,
+                   COALESCE(d.plant_name, d.plant_code) AS plant_name,
+                   COALESCE(d.line_name, d.line_code) AS line_name
+            FROM alerts a
+            LEFT JOIN network_devices d ON d.id = a.device_id
+            {alert_where}
+            ORDER BY CASE a.severity WHEN 'CRITICAL' THEN 0 ELSE 1 END, a.last_detected_at DESC, a.id DESC
+            LIMIT ?
+            """,
+            alert_params + [alert_limit],
+        ).fetchall()
+    )
+
+    recent_metrics = rows_to_dicts(
+        conn.execute(
+            f"""
+            SELECT m.checked_at, m.status, m.latency_ms, m.packet_loss_percent, m.check_method,
+                   d.device_name, d.ip_address,
+                   COALESCE(d.plant_name, d.plant_code) AS plant_name,
+                   COALESCE(d.line_name, d.line_code) AS line_name
+            FROM device_metrics m
+            JOIN network_devices d ON d.id = m.device_id
+            {device_where}
+            ORDER BY m.checked_at DESC, m.id DESC
+            LIMIT ?
+            """,
+            device_params + [metric_limit],
+        ).fetchall()
+    )
+
+    active_alert_clauses = ["a.status = 'ACTIVE'"]
+    active_alert_params: list[Any] = []
+    if filters.get("plant") or filters.get("line") or filters.get("status"):
+        filtered_active_clauses, filtered_active_params = _device_filter_clauses(filters)
+        active_alert_clauses.extend(filtered_active_clauses)
+        active_alert_params.extend(filtered_active_params)
+    active_alert_where = f"WHERE {' AND '.join(active_alert_clauses)}"
+    active_alerts = conn.execute(
+        f"""
+        SELECT COUNT(*)
+        FROM alerts a
+        LEFT JOIN network_devices d ON d.id = a.device_id
+        {active_alert_where}
+        """,
+        active_alert_params,
+    ).fetchone()[0]
+    critical_alerts = conn.execute(
+        f"""
+        SELECT COUNT(*)
+        FROM alerts a
+        LEFT JOIN network_devices d ON d.id = a.device_id
+        {active_alert_where} AND a.severity = 'CRITICAL'
+        """,
+        active_alert_params,
+    ).fetchone()[0]
+
+    by_ap: list[dict[str, Any]] = []
+    if filters.get("include_ap", True):
+        ap_clauses, ap_params = _device_filter_clauses(filters)
+        ap_clauses.append("UPPER(d.device_type) = 'AP'")
+        ap_where = f"WHERE {' AND '.join(ap_clauses)}"
+        aps = rows_to_dicts(
+            conn.execute(
+                f"""
+                SELECT d.*
+                FROM network_devices d
+                {ap_where}
+                ORDER BY COALESCE(d.plant_name, d.plant_code), COALESCE(d.line_name, d.line_code), d.device_name
+                LIMIT 50
+                """,
+                ap_params,
+            ).fetchall()
+        )
+        by_ap = [_ap_summary(conn, ap) for ap in aps]
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "filters": {
+            "plant": filters.get("plant"),
+            "line": filters.get("line"),
+            "status": filters.get("status"),
+            "device_limit": device_limit,
+            "alert_limit": alert_limit,
+            "metric_limit": metric_limit,
+            "include_ap": bool(filters.get("include_ap", True)),
+        },
+        "summary": {
+            "total_devices": total_devices,
+            "status_counts": status_counts,
+            "active_alerts": active_alerts,
+            "critical_alerts": critical_alerts,
+        },
+        "devices": devices,
+        "recent_alerts": recent_alerts,
+        "recent_metrics": recent_metrics,
+        "by_ap": by_ap,
+    }
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/backend/runtime")
+def backend_runtime(actor: Actor = Depends(get_actor)) -> dict[str, Any]:
+    require_admin(actor)
+    database: dict[str, Any]
+    if settings.database_engine == "mssql":
+        database = {
+            "engine": "mssql",
+            "server": settings.mssql_server,
+            "port": settings.mssql_port,
+            "database": settings.mssql_database,
+            "driver": settings.mssql_driver,
+            "trust_server_certificate": settings.mssql_trust_server_certificate,
+        }
+    else:
+        database = {
+            "engine": "sqlite",
+            "path": str(settings.database_path),
+            "exists": settings.database_path.exists(),
+        }
+    return {
+        "app_name": settings.app_name,
+        "process": {
+            "pid": os.getpid(),
+            "host": os.getenv("NMS_HOST", "0.0.0.0"),
+            "port": int(os.getenv("NMS_PORT", "8080")),
+        },
+        "database": database,
+        "frontend": {
+            "dist_path": str(settings.frontend_dist_path),
+            "exists": settings.frontend_dist_path.exists(),
+        },
+        "workers": {
+            "ping_collector_enabled": settings.collector_enabled,
+            "ping_interval_seconds": settings.collector_interval_seconds,
+            "ping_count": settings.ping_count,
+            "tcp_fallback_ports": settings.tcp_fallback_ports,
+            "ap_client_discovery_enabled": settings.ap_client_discovery_enabled,
+            "ap_client_discovery_interval_seconds": settings.ap_client_discovery_interval_seconds,
+        },
+        "api": {
+            "docs": "/docs",
+            "dashboard_get": "/api/display/dashboard",
+            "dashboard_post": "/api/display/dashboard",
+            "display_page": "/display",
+        },
+    }
+
+
+@app.get("/api/display/dashboard")
+def display_dashboard_get(
+    request: Request,
+    plant: str | None = None,
+    line: str | None = None,
+    status: str | None = None,
+    device_limit: int = Query(200, ge=1, le=1000),
+    alert_limit: int = Query(20, ge=1, le=100),
+    metric_limit: int = Query(60, ge=1, le=500),
+    include_ap: bool = True,
+) -> dict[str, Any]:
+    _require_display_access(request)
+    with transaction() as conn:
+        return _dashboard_display_payload(
+            conn,
+            {
+                "plant": plant,
+                "line": line,
+                "status": status,
+                "device_limit": device_limit,
+                "alert_limit": alert_limit,
+                "metric_limit": metric_limit,
+                "include_ap": include_ap,
+            },
+        )
+
+
+@app.post("/api/display/dashboard")
+def display_dashboard_post(payload: DisplayDashboardRequest, request: Request) -> dict[str, Any]:
+    _require_display_access(request)
+    with transaction() as conn:
+        return _dashboard_display_payload(conn, payload.model_dump())
 
 
 @app.post("/api/auth/login")
@@ -1186,6 +1470,15 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(_request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
+@app.get("/display")
+@app.get("/display/{_path:path}")
+def display_page() -> FileResponse:
+    index_path = settings.frontend_dist_path / "index.html"
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail="Frontend dashboard is not built")
+    return FileResponse(index_path)
 
 
 if settings.frontend_dist_path.exists():

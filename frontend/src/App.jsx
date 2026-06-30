@@ -23,8 +23,10 @@ import APClientDiscoveryPage from "./pages/APClientDiscoveryPage.jsx";
 import AlertBell from "./components/AlertBell.jsx";
 import AlertCenter from "./pages/AlertCenter.jsx";
 import AuditLogPage from "./pages/AuditLogPage.jsx";
+import BackendInfoPage from "./pages/BackendInfoPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import DeviceAdminPage from "./pages/DeviceAdminPage.jsx";
+import DisplayDashboardPage from "./pages/DisplayDashboardPage.jsx";
 import ExcelExportPage from "./pages/ExcelExportPage.jsx";
 import ExcelImportPage from "./pages/ExcelImportPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
@@ -39,6 +41,7 @@ const ADMIN_ROUTES = [
   { key: "export", label: "Excel Export", icon: FileDown, page: ExcelExportPage },
   { key: "audit", label: "Audit Logs", icon: History, page: AuditLogPage },
   { key: "monitoring", label: "Monitoring Logs", icon: ListChecks, page: MonitoringLogPage },
+  { key: "backend", label: "Backend Info", icon: Server, page: BackendInfoPage },
   { key: "settings", label: "Settings", icon: Settings, page: SystemSettingsPage }
 ];
 
@@ -47,7 +50,7 @@ function normalizeRole(value) {
   return role === "VIEWER" ? "USER" : role;
 }
 
-export default function App() {
+function AuthenticatedApp() {
   const [route, setRoute] = useState("dashboard");
   const [user, setUser] = useState(getStoredUser());
   const [summary, setSummary] = useState(null);
@@ -235,4 +238,12 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+export default function App() {
+  if (window.location.pathname.startsWith("/display")) {
+    return <DisplayDashboardPage />;
+  }
+
+  return <AuthenticatedApp />;
 }
