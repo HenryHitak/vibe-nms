@@ -21,6 +21,13 @@ def first_existing_path(paths: list[Path]) -> Path:
     return paths[0]
 
 
+def env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
 def default_paths() -> None:
     root = runtime_root()
     source_root = Path(__file__).resolve().parent.parent
@@ -43,7 +50,7 @@ def default_paths() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Vibe NMS without Docker")
     parser.add_argument("--host", default=os.getenv("NMS_HOST", "0.0.0.0"))
-    parser.add_argument("--port", type=int, default=int(os.getenv("NMS_PORT", "8080")))
+    parser.add_argument("--port", type=int, default=env_int("NMS_PORT", 8080))
     args = parser.parse_args()
 
     default_paths()
