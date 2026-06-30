@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, CheckCircle2, RadioTower, ServerCrash } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Filter, RadioTower, ServerCrash } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api.js";
 import AlertBanner from "../components/AlertBanner.jsx";
@@ -14,7 +14,7 @@ function Stat({ icon: Icon, label, value, tone }) {
     blue: "text-cyan-700"
   }[tone] || "text-slate-600";
   return (
-    <div className="rounded-md border border-line bg-white p-4">
+    <div className="rounded-md border border-line bg-white p-4 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm text-slate-500">{label}</span>
         <Icon className={toneClass} size={18} />
@@ -28,6 +28,8 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState(null);
   const [devices, setDevices] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [plantFilter, setPlantFilter] = useState("");
+  const [lineFilter, setLineFilter] = useState("");
   const [error, setError] = useState("");
 
   async function load() {
@@ -38,7 +40,6 @@ export default function DashboardPage() {
       ]);
       setSummary(summaryPayload);
       setDevices(devicesPayload);
-      if (!selected && devicesPayload.length) setSelected(devicesPayload[0]);
       setError("");
     } catch (err) {
       setError(err.message);
@@ -51,35 +52,153 @@ export default function DashboardPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const counts = summary?.status_counts || {};
+  const plantOptions = useMemo(
+    () => [...new Set(devices.map((device) => device.plant_code).filter(Boolean))].sort(),
+    [devices]
+  );
+
+  const lineOptions = useMemo(
+    () => [...new Set(devices.filter((device) => !plantFilter || device.plant_code === plantFilter).map((device) => device.line_code).filter(Boolean))].sort(),
+    [devices, plantFilter]
+  );
+
+  const filteredDevices = useMemo(
+    () => devices.filter((device) => (!plantFilter || device.plant_code === plantFilter) && (!lineFilter || device.line_code === lineFilter)),
+    [devices, plantFilter, lineFilter]
+  );
+
+  useEffect(() => {
+    if (lineFilter && !lineOptions.includes(lineFilter)) {
+      setLineFilter("");
+    }
+  }, [lineFilter, lineOptions]);
+
+  useEffect(() => {
+    if (!filteredDevices.length) {
+      setSelected(null);
+      return;
+    }
+    if (!selected || !filteredDevices.some((device) => device.id === selected.id)) {
+      setSelected(filteredDevices[0]);
+    }
+  }, [filteredDevices, selected]);
+
+  const counts = useMemo(
+    () => filteredDevices.reduce((acc, device) => {
+      acc[device.status || "UNKNOWN"] = (acc[device.status || "UNKNOWN"] || 0) + 1;
+      return acc;
+    }, {}),
+    [filteredDevices]
+  );
+
+  const plantImpact = useMemo(() => {
+    const plants = new Map();
+    for (const device of devices) {
+      const key = device.plant_code || "UNKNOWN";
+      const current = plants.get(key) || {
+        plant_code: key,
+        plant_name: device.plant_name || key,
+        total: 0,
+        online: 0,
+        warning: 0,
+        offline: 0,
+        lines: new Set()
+      };
+      current.total += 1;
+      current.lines.add(device.line_code);
+      if (device.status === "ONLINE") current.online += 1;
+      else if (["WARNING", "UNCERTAIN", "FLAPPING"].includes(device.status)) current.warning += 1;
+      else if (["OFFLINE", "CRITICAL"].includes(device.status)) current.offline += 1;
+      plants.set(key, current);
+    }
+    return [...plants.values()]
+      .map((plant) => ({ ...plant, line_count: plant.lines.size }))
+      .sort((a, b) => b.offline - a.offline || b.warning - a.warning || a.plant_code.localeCompare(b.plant_code));
+  }, [devices]);
+
   const chartCounts = useMemo(
     () => ["ONLINE", "WARNING", "UNCERTAIN", "FLAPPING", "OFFLINE", "CRITICAL", "UNKNOWN"].map((status) => ({ status, count: counts[status] || 0 })),
     [counts]
   );
   const trend = useMemo(
-    () => [...(summary?.recent_metrics || [])].reverse().slice(-30).map((row, index) => ({
+    () => [...(summary?.recent_metrics || [])]
+      .filter((row) => (!plantFilter || row.plant_code === plantFilter) && (!lineFilter || row.line_code === lineFilter))
+      .reverse()
+      .slice(-30)
+      .map((row, index) => ({
       index: index + 1,
       latency: row.latency_ms ?? 0,
       loss: row.packet_loss_percent ?? 0,
       device: row.device_name
     })),
-    [summary]
+    [summary, plantFilter, lineFilter]
   );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <AlertBanner alerts={summary?.recent_alerts || []} />
-      <div className="min-h-0 flex-1 overflow-auto p-5">
+      <div className="min-h-0 flex-1 overflow-auto">
         {error ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
+
+        <section className="mb-4 rounded-md border border-line bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <Filter size={16} className="text-slate-500" /> Filter
+            </div>
+            <select className="h-10 min-w-40 rounded-md border border-line bg-white px-3 text-sm" value={plantFilter} onChange={(event) => setPlantFilter(event.target.value)}>
+              <option value="">All Plants</option>
+              {plantOptions.map((plant) => <option key={plant} value={plant}>{plant}</option>)}
+            </select>
+            <select className="h-10 min-w-40 rounded-md border border-line bg-white px-3 text-sm" value={lineFilter} onChange={(event) => setLineFilter(event.target.value)}>
+              <option value="">All Lines</option>
+              {lineOptions.map((line) => <option key={line} value={line}>{line}</option>)}
+            </select>
+            <button className="h-10 rounded-md border border-line bg-slate-50 px-3 text-sm font-semibold text-slate-700" onClick={() => { setPlantFilter(""); setLineFilter(""); }}>
+              Reset
+            </button>
+            <div className="ml-auto text-sm text-slate-500">{filteredDevices.length} of {devices.length} devices</div>
+          </div>
+        </section>
+
         <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Stat icon={RadioTower} label="Devices" value={summary?.total_devices} tone="blue" />
+          <Stat icon={RadioTower} label="Devices" value={filteredDevices.length} tone="blue" />
           <Stat icon={CheckCircle2} label="Online" value={counts.ONLINE || 0} tone="green" />
           <Stat icon={AlertTriangle} label="Warning" value={(counts.WARNING || 0) + (counts.UNCERTAIN || 0) + (counts.FLAPPING || 0)} tone="orange" />
           <Stat icon={ServerCrash} label="Offline / Critical" value={(counts.OFFLINE || 0) + (counts.CRITICAL || 0)} tone="red" />
         </div>
 
+        <section className="mb-5 rounded-md border border-line bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold">Plant Impact</h2>
+            <span className="text-sm text-slate-500">{plantImpact.length} plants</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {plantImpact.slice(0, 8).map((plant) => (
+              <button
+                key={plant.plant_code}
+                className={`rounded-md border p-3 text-left transition-colors ${plantFilter === plant.plant_code ? "border-cyan-400 bg-cyan-50" : "border-line bg-slate-50 hover:bg-white"}`}
+                onClick={() => setPlantFilter(plant.plant_code)}
+              >
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate font-semibold text-ink">{plant.plant_code}</div>
+                    <div className="truncate text-xs text-slate-500">{plant.plant_name}</div>
+                  </div>
+                  <div className={`h-3 w-3 rounded-full ${plant.offline ? "bg-red-nms" : plant.warning ? "bg-orange-nms" : "bg-green-nms"}`} />
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-xs">
+                  <div><div className="font-semibold">{plant.total}</div><div className="text-slate-500">Total</div></div>
+                  <div><div className="font-semibold text-green-nms">{plant.online}</div><div className="text-slate-500">Online</div></div>
+                  <div><div className="font-semibold text-orange-nms">{plant.warning}</div><div className="text-slate-500">Warn</div></div>
+                  <div><div className="font-semibold text-red-nms">{plant.offline}</div><div className="text-slate-500">Down</div></div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+
         <div className="mb-5 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.3fr]">
-          <section className="rounded-md border border-line bg-white p-4">
+          <section className="rounded-md border border-line bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
               <Activity size={18} className="text-slate-500" />
               <h2 className="font-semibold">Network State</h2>
@@ -97,7 +216,7 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <section className="rounded-md border border-line bg-white p-4">
+          <section className="rounded-md border border-line bg-white p-4 shadow-sm">
             <h2 className="mb-3 font-semibold">Recent Metrics</h2>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
@@ -119,9 +238,9 @@ export default function DashboardPage() {
           <section className="min-h-0">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-semibold">Devices</h2>
-              <span className="text-sm text-slate-500">{devices.length} active</span>
+              <span className="text-sm text-slate-500">{filteredDevices.length} active</span>
             </div>
-            <DeviceTable devices={devices} selectedId={selected?.id} onSelect={setSelected} />
+            <DeviceTable devices={filteredDevices} selectedId={selected?.id} onSelect={setSelected} />
           </section>
           <DeviceDetailPanel device={selected} />
         </div>
@@ -129,4 +248,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

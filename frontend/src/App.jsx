@@ -10,6 +10,8 @@ import {
   LogOut,
   Menu,
   MonitorCog,
+  PanelLeftClose,
+  PanelLeftOpen,
   Server,
   Settings,
   Shield,
@@ -50,6 +52,7 @@ export default function App() {
   const [summary, setSummary] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("nms.sidebarCollapsed") === "true");
   const role = normalizeRole(user?.role);
 
   const routes = useMemo(() => {
@@ -99,9 +102,13 @@ export default function App() {
       }
     }
     loadSummary();
-    const timer = setInterval(loadSummary, 10000);
+    const timer = setInterval(loadSummary, 5000);
     return () => clearInterval(timer);
   }, [user]);
+
+  useEffect(() => {
+    localStorage.setItem("nms.sidebarCollapsed", String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   function logout() {
     clearSession();
@@ -127,51 +134,60 @@ export default function App() {
     return (
       <button
         key={item.key}
-        className={`flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-medium ${active ? "bg-ink text-white" : "text-slate-700 hover:bg-slate-100"}`}
+        className={`flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-medium transition-colors ${sidebarCollapsed ? "justify-center px-0" : ""} ${active ? "bg-ink text-white" : "text-slate-700 hover:bg-slate-100"}`}
+        title={item.label}
         onClick={() => {
           setRoute(item.key);
           setMobileOpen(false);
         }}
       >
-        <Icon size={17} />
-        <span className="truncate">{item.label}</span>
+        <Icon size={18} />
+        {!sidebarCollapsed ? <span className="truncate">{item.label}</span> : null}
       </button>
     );
   }
 
   return (
-    <div className="flex h-screen min-h-0 bg-panel text-ink">
-      <aside className={`${mobileOpen ? "fixed inset-y-0 left-0 z-40 block w-72" : "hidden"} border-r border-line bg-white p-4 md:block md:w-72`}>
-        <div className="mb-6 flex items-center gap-3">
+    <div className="flex h-screen min-h-0 bg-slate-100 text-ink">
+      <aside className={`${mobileOpen ? "fixed inset-y-0 left-0 z-40 block w-72" : "hidden"} border-r border-line bg-white p-4 shadow-sm transition-[width] duration-200 md:block ${sidebarCollapsed ? "md:w-20" : "md:w-72"}`}>
+        <div className={`mb-6 flex items-center ${sidebarCollapsed ? "justify-center" : "gap-3"}`}>
           <div className="flex h-10 w-10 items-center justify-center rounded-md bg-ink text-white">
             <MonitorCog size={22} />
           </div>
-          <div>
+          {!sidebarCollapsed ? <div>
             <div className="font-semibold">Vibe NMS</div>
             <div className="text-xs text-slate-500">Internal Network Monitoring</div>
-          </div>
+          </div> : null}
         </div>
+        <button
+          className={`mb-4 hidden h-9 w-full items-center rounded-md border border-line bg-white px-3 text-sm text-slate-700 hover:bg-slate-50 md:flex ${sidebarCollapsed ? "justify-center px-0" : "justify-between"}`}
+          onClick={() => setSidebarCollapsed((value) => !value)}
+          title={sidebarCollapsed ? "Expand menu" : "Collapse menu"}
+        >
+          {!sidebarCollapsed ? <span>Menu</span> : null}
+          {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+        </button>
         <nav className="space-y-1">
           {routes.slice(0, 2).map(navButton)}
         </nav>
         {role === "ADMIN" ? (
           <>
-            <div className="mb-2 mt-6 flex items-center gap-2 px-3 text-xs font-semibold uppercase text-slate-500">
-              <Shield size={14} /> Admin
+            <div className={`mb-2 mt-6 flex items-center gap-2 px-3 text-xs font-semibold uppercase text-slate-500 ${sidebarCollapsed ? "justify-center px-0" : ""}`}>
+              <Shield size={14} /> {!sidebarCollapsed ? "Admin" : null}
             </div>
             <nav className="space-y-1">
               {ADMIN_ROUTES.map(navButton)}
             </nav>
           </>
         ) : null}
-        <div className="mt-6 rounded-md border border-line bg-slate-50 p-3 text-xs text-slate-600">
+        {!sidebarCollapsed ? <div className="mt-6 rounded-md border border-line bg-slate-50 p-3 text-xs text-slate-600">
           <div className="mb-1 font-semibold text-slate-700">Package</div>
           <div className="flex items-center gap-2"><DatabaseBackup size={14} /> Docker Compose ready</div>
-        </div>
+        </div> : null}
       </aside>
 
-      <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-line bg-white px-4 md:px-5">
+      <main className="flex min-w-0 flex-1 flex-col p-3 md:p-5">
+        <header className="mb-4 flex h-16 shrink-0 items-center justify-between rounded-md border border-line bg-white px-4 shadow-sm md:px-5">
           <div className="flex min-w-0 items-center gap-3">
             <button className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-line md:hidden" onClick={() => setMobileOpen((value) => !value)}>
               <Menu size={18} />
@@ -192,7 +208,7 @@ export default function App() {
             </button>
           </div>
         </header>
-        <div className="min-h-0 flex-1 overflow-hidden p-0">
+        <div className="min-h-0 flex-1 overflow-hidden">
           <ActivePage role={role} />
         </div>
       </main>

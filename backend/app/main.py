@@ -288,7 +288,8 @@ def dashboard_summary() -> dict[str, Any]:
         recent_metrics = rows_to_dicts(
             conn.execute(
                 """
-                SELECT m.checked_at, m.status, m.latency_ms, m.packet_loss_percent, d.device_name, d.ip_address
+                SELECT m.checked_at, m.status, m.latency_ms, m.packet_loss_percent,
+                       d.device_name, d.ip_address, d.plant_code, d.line_code
                 FROM device_metrics m
                 JOIN network_devices d ON d.id = m.device_id
                 ORDER BY m.checked_at DESC, m.id DESC
