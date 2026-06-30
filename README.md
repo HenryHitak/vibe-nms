@@ -82,6 +82,19 @@ Use read-only controller/API tokens whenever possible. These tokens are never re
 
 Open `AP Clients` to see each AP's status, connected client count, known/unknown counts, connected IP list, MAC, hostname, SSID, VLAN, RSSI, last seen time, and status. Admins can manually run discovery from that page; manual runs are written to `Audit Logs` with username and source IP.
 
+Admins can also use `AP Clients` as a CRUD screen for known wireless clients. Registering an observed client creates a `network_devices` row tied to the selected AP, so future discovery runs can mark it as known, detect wrong AP connections, and monitor missing critical clients.
+
+AP client CRUD endpoints:
+
+```text
+GET /api/access-points/{ap_id}/registered-clients
+POST /api/access-points/{ap_id}/registered-clients
+PUT /api/access-points/{ap_id}/registered-clients/{device_id}
+DELETE /api/access-points/{ap_id}/registered-clients/{device_id}
+```
+
+Deleting a registered AP client soft-deletes the underlying Device Master row and writes an audit log.
+
 ## Windows Installer Without Docker
 
 You can run Vibe NMS without Docker on a Windows PC or Windows Server.

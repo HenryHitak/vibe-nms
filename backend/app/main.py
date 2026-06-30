@@ -36,6 +36,8 @@ from .import_export import (
 )
 from .monitor import collector_loop, run_monitoring_cycle
 from .schemas import (
+    APClientRegistrationPatch,
+    APClientRegistrationPayload,
     BulkSettingsPayload,
     DevicePatch,
     DevicePayload,
@@ -1113,6 +1115,61 @@ def _get_access_point(conn: sqlite3.Connection, ap_id: int) -> dict[str, Any]:
     return ap
 
 
+def _ap_client_scope_clause() -> str:
+    return """
+        d.is_deleted = 0
+        AND UPPER(d.device_type) != 'AP'
+        AND (
+            (d.connected_ap_ip IS NOT NULL AND d.connected_ap_ip = ?)
+            OR (d.connected_ap_name IS NOT NULL AND UPPER(d.connected_ap_name) = UPPER(?))
+        )
+    """
+
+
+def _get_registered_ap_client(conn: sqlite3.Connection, ap: dict[str, Any], device_id: int) -> dict[str, Any]:
+    row = conn.execute(
+        f"""
+        SELECT d.*
+        FROM network_devices d
+        WHERE d.id = ? AND {_ap_client_scope_clause()}
+        """,
+        (device_id, ap.get("ip_address"), ap.get("device_name")),
+    ).fetchone()
+    client = row_to_dict(row)
+    if not client:
+        raise HTTPException(status_code=404, detail="Registered AP client not found")
+    return client
+
+
+def _ap_client_device_data(ap: dict[str, Any], payload: dict[str, Any], partial: bool = False) -> dict[str, Any]:
+    data = {key: value for key, value in payload.items() if value is not None}
+    plant_value = ap.get("plant_name") or ap.get("plant_code") or "UNKNOWN"
+    line_value = ap.get("line_name") or ap.get("line_code") or "UNKNOWN"
+    if not partial:
+        data["plant_name"] = plant_value
+        data["line_name"] = line_value
+        data["device_type"] = data.get("device_type") or "OTHER"
+        data["criticality"] = data.get("criticality") or "MEDIUM"
+        data["monitoring_enabled"] = data.get("monitoring_enabled", True)
+    data.update(
+        {
+            "plant_code": plant_value,
+            "plant_name": plant_value,
+            "building": ap.get("building"),
+            "floor": ap.get("floor"),
+            "area": ap.get("area"),
+            "zone": ap.get("zone"),
+            "line_code": line_value,
+            "line_name": line_value,
+            "connected_ap_name": ap.get("device_name"),
+            "connected_ap_ip": ap.get("ip_address"),
+        }
+    )
+    if str(data.get("device_type") or "").upper() == "AP":
+        raise HTTPException(status_code=422, detail="AP client device type cannot be AP")
+    return _validate_device_data(data, partial=partial)
+
+
 def _ap_summary(conn: sqlite3.Connection, ap: dict[str, Any]) -> dict[str, Any]:
     clients = rows_to_dicts(
         conn.execute(
@@ -1161,6 +1218,136 @@ def access_point_clients(ap_id: int) -> list[dict[str, Any]]:
             (ap_id,),
         ).fetchall()
         return rows_to_dicts(rows)
+
+
+@app.get("/api/access-points/{ap_id}/registered-clients")
+def list_registered_ap_clients(ap_id: int) -> list[dict[str, Any]]:
+    with transaction() as conn:
+        ap = _get_access_point(conn, ap_id)
+        rows = conn.execute(
+            f"""
+            SELECT d.*
+            FROM network_devices d
+            WHERE {_ap_client_scope_clause()}
+            ORDER BY d.device_name
+            """,
+            (ap.get("ip_address"), ap.get("device_name")),
+        ).fetchall()
+        return rows_to_dicts(rows)
+
+
+@app.post("/api/access-points/{ap_id}/registered-clients", status_code=201)
+def create_registered_ap_client(
+    ap_id: int,
+    payload: APClientRegistrationPayload,
+    actor: Actor = Depends(get_actor),
+) -> dict[str, Any]:
+    require_admin(actor)
+    with transaction() as conn:
+        ap = _get_access_point(conn, ap_id)
+        data = _ap_client_device_data(ap, payload.model_dump(), partial=False)
+        try:
+            columns = DEVICE_COLUMNS + ["created_by", "created_from_ip"]
+            values = [data.get(column) for column in DEVICE_COLUMNS] + [actor.username, actor.ip_address]
+            cursor = conn.execute(
+                f"INSERT INTO network_devices({', '.join(columns)}) VALUES ({', '.join(['?'] * len(columns))})",
+                values,
+            )
+            created = row_to_dict(conn.execute("SELECT * FROM network_devices WHERE id = ?", (cursor.lastrowid,)).fetchone()) or {}
+            write_audit_log(
+                conn,
+                actor,
+                "CREATE",
+                "AP_CLIENT",
+                entity_id=cursor.lastrowid,
+                target_ip_address=created.get("ip_address"),
+                after_data=created,
+                changed={},
+            )
+            return created
+        except Exception as exc:
+            _audit_failure(actor, "CREATE", "AP_CLIENT", exc, data.get("ip_address"))
+            if isinstance(exc, sqlite3.IntegrityError):
+                raise HTTPException(status_code=409, detail="Client IP already exists in Device Master") from exc
+            raise
+
+
+@app.put("/api/access-points/{ap_id}/registered-clients/{device_id}")
+def update_registered_ap_client(
+    ap_id: int,
+    device_id: int,
+    payload: APClientRegistrationPatch,
+    actor: Actor = Depends(get_actor),
+) -> dict[str, Any]:
+    require_admin(actor)
+    with transaction() as conn:
+        ap = _get_access_point(conn, ap_id)
+        before = _get_registered_ap_client(conn, ap, device_id)
+        patch = _ap_client_device_data(ap, payload.model_dump(exclude_none=True), partial=True)
+        if not patch:
+            raise HTTPException(status_code=422, detail="No fields to update")
+        try:
+            assignments = ", ".join([f"{field} = ?" for field in patch])
+            conn.execute(
+                f"""
+                UPDATE network_devices
+                SET {assignments}, updated_by = ?, updated_from_ip = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                list(patch.values()) + [actor.username, actor.ip_address, device_id],
+            )
+            after = _get_registered_ap_client(conn, ap, device_id)
+            write_audit_log(
+                conn,
+                actor,
+                "UPDATE",
+                "AP_CLIENT",
+                entity_id=device_id,
+                target_ip_address=after.get("ip_address"),
+                before_data=before,
+                after_data=after,
+                changed=changed_fields(before, after),
+            )
+            return after
+        except Exception as exc:
+            _audit_failure(actor, "UPDATE", "AP_CLIENT", exc, patch.get("ip_address"))
+            if isinstance(exc, sqlite3.IntegrityError):
+                raise HTTPException(status_code=409, detail="Client IP already exists in Device Master") from exc
+            raise
+
+
+@app.delete("/api/access-points/{ap_id}/registered-clients/{device_id}")
+def delete_registered_ap_client(
+    ap_id: int,
+    device_id: int,
+    actor: Actor = Depends(get_actor),
+) -> dict[str, str]:
+    require_admin(actor)
+    with transaction() as conn:
+        ap = _get_access_point(conn, ap_id)
+        before = _get_registered_ap_client(conn, ap, device_id)
+        conn.execute(
+            """
+            UPDATE network_devices
+            SET is_deleted = 1, deleted_by = ?, deleted_from_ip = ?, deleted_at = CURRENT_TIMESTAMP,
+                updated_by = ?, updated_from_ip = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (actor.username, actor.ip_address, actor.username, actor.ip_address, device_id),
+        )
+        after = row_to_dict(conn.execute("SELECT * FROM network_devices WHERE id = ?", (device_id,)).fetchone()) or {}
+        write_audit_log(
+            conn,
+            actor,
+            "DELETE",
+            "AP_CLIENT",
+            entity_id=device_id,
+            target_ip_address=before.get("ip_address"),
+            before_data=before,
+            after_data=after,
+            changed=changed_fields(before, after),
+        )
+        return {"status": "deleted"}
 
 
 @app.get("/api/access-points/{ap_id}/clients/history")

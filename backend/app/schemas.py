@@ -89,6 +89,32 @@ class DisplayDashboardRequest(BaseModel):
     include_ap: bool = True
 
 
+class APClientRegistrationPayload(BaseModel):
+    device_name: str
+    device_type: str = "OTHER"
+    ip_address: str
+    mac_address: str | None = None
+    hostname: str | None = None
+    vlan: int | None = None
+    owner_department: str | None = None
+    criticality: str = "MEDIUM"
+    monitoring_enabled: bool = True
+    notes: str | None = None
+
+
+class APClientRegistrationPatch(BaseModel):
+    device_name: str | None = None
+    device_type: str | None = None
+    ip_address: str | None = None
+    mac_address: str | None = None
+    hostname: str | None = None
+    vlan: int | None = None
+    owner_department: str | None = None
+    criticality: str | None = None
+    monitoring_enabled: bool | None = None
+    notes: str | None = None
+
+
 class LoginRequest(BaseModel):
     username: str
     password: str

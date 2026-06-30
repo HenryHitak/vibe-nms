@@ -99,6 +99,8 @@ NMS_MSSQL_PASSWORD=your-password
 
 AP controller API tokens also go in `.env`; they are only read by the backend process and are not exposed to the browser.
 
+`AP Clients` includes CRUD for registered wireless clients. Admins can add an observed unknown client as a known device, edit it, or delete the registration from that AP.
+
 External display dashboard:
 
 ```text

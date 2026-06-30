@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, MapPin, RefreshCw, Wifi } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Edit3, MapPin, Plus, RefreshCw, Save, Trash2, Wifi, X } from "lucide-react";
 import { api } from "../api.js";
 import StatusBadge from "../components/StatusBadge.jsx";
 
@@ -45,11 +45,27 @@ function SummaryStat({ label, value, tone }) {
   );
 }
 
+const EMPTY_REGISTERED_CLIENT = {
+  device_name: "",
+  device_type: "OTHER",
+  ip_address: "",
+  mac_address: "",
+  hostname: "",
+  vlan: "",
+  owner_department: "",
+  criticality: "MEDIUM",
+  monitoring_enabled: true,
+  notes: ""
+};
+
 export default function APClientDiscoveryPage({ role }) {
   const [aps, setAps] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [summary, setSummary] = useState(null);
   const [clients, setClients] = useState([]);
+  const [registeredClients, setRegisteredClients] = useState([]);
+  const [registeredForm, setRegisteredForm] = useState(EMPTY_REGISTERED_CLIENT);
+  const [editingRegistered, setEditingRegistered] = useState(null);
   const [history, setHistory] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -77,13 +93,15 @@ export default function APClientDiscoveryPage({ role }) {
     if (!apId) return;
     setLoading(true);
     try {
-      const [summaryPayload, clientsPayload, historyPayload] = await Promise.all([
+      const [summaryPayload, clientsPayload, registeredPayload, historyPayload] = await Promise.all([
         api(`/access-points/${apId}/summary`),
         api(`/access-points/${apId}/clients`),
+        api(`/access-points/${apId}/registered-clients`),
         api(`/access-points/${apId}/clients/history?limit=100`)
       ]);
       setSummary(summaryPayload);
       setClients(clientsPayload);
+      setRegisteredClients(registeredPayload);
       setHistory(historyPayload);
       setError("");
     } catch (err) {
@@ -101,6 +119,7 @@ export default function APClientDiscoveryPage({ role }) {
 
   useEffect(() => {
     loadSelected(selectedId);
+    resetRegisteredForm();
   }, [selectedId]);
 
   async function runDiscovery() {
@@ -113,6 +132,99 @@ export default function APClientDiscoveryPage({ role }) {
       setError(err.message);
     } finally {
       setRunning(false);
+    }
+  }
+
+  function resetRegisteredForm() {
+    setEditingRegistered(null);
+    setRegisteredForm(EMPTY_REGISTERED_CLIENT);
+  }
+
+  function changeRegisteredForm(event) {
+    const { name, value, type, checked } = event.target;
+    setRegisteredForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
+  }
+
+  function registerObservedClient(client) {
+    setEditingRegistered(null);
+    setRegisteredForm({
+      ...EMPTY_REGISTERED_CLIENT,
+      device_name: client.client_hostname || client.client_ip_address || client.client_mac_address || "",
+      ip_address: client.client_ip_address || "",
+      mac_address: client.client_mac_address || "",
+      hostname: client.client_hostname || "",
+      vlan: client.vlan ?? "",
+      notes: `Registered from AP discovery on ${selectedAp?.device_name || "selected AP"}`
+    });
+  }
+
+  function editRegisteredClient(client) {
+    setEditingRegistered(client);
+    setRegisteredForm({
+      device_name: client.device_name || "",
+      device_type: client.device_type || "OTHER",
+      ip_address: client.ip_address || "",
+      mac_address: client.mac_address || "",
+      hostname: client.hostname || "",
+      vlan: client.vlan ?? "",
+      owner_department: client.owner_department || "",
+      criticality: client.criticality || "MEDIUM",
+      monitoring_enabled: Boolean(client.monitoring_enabled),
+      notes: client.notes || ""
+    });
+  }
+
+  function registeredPayload() {
+    return {
+      ...registeredForm,
+      device_name: registeredForm.device_name.trim(),
+      ip_address: registeredForm.ip_address.trim(),
+      mac_address: registeredForm.mac_address.trim() || null,
+      hostname: registeredForm.hostname.trim() || null,
+      vlan: registeredForm.vlan === "" ? null : Number(registeredForm.vlan),
+      owner_department: registeredForm.owner_department.trim() || null,
+      notes: registeredForm.notes.trim() || null
+    };
+  }
+
+  async function saveRegisteredClient() {
+    if (!selectedId) return;
+    const payload = registeredPayload();
+    if (!payload.device_name || !payload.ip_address) {
+      setError("Client name and IP are required.");
+      return;
+    }
+    try {
+      if (editingRegistered?.id) {
+        await api(`/access-points/${selectedId}/registered-clients/${editingRegistered.id}`, {
+          method: "PUT",
+          body: JSON.stringify(payload)
+        });
+      } else {
+        await api(`/access-points/${selectedId}/registered-clients`, {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+      }
+      resetRegisteredForm();
+      await loadSelected(selectedId);
+      setError("");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function deleteRegisteredClient(client) {
+    if (!selectedId || !window.confirm(`Delete registered AP client "${client.device_name}"?`)) return;
+    try {
+      await api(`/access-points/${selectedId}/registered-clients/${client.id}`, { method: "DELETE" });
+      if (editingRegistered?.id === client.id) {
+        resetRegisteredForm();
+      }
+      await loadSelected(selectedId);
+      setError("");
+    } catch (err) {
+      setError(err.message);
     }
   }
 
@@ -229,6 +341,128 @@ export default function APClientDiscoveryPage({ role }) {
                 </div>
               </section>
 
+              <section className="rounded-md border border-line bg-white p-4 shadow-sm">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-semibold">Registered AP Clients</h2>
+                    <div className="text-sm text-slate-500">Known wireless devices expected on this AP.</div>
+                  </div>
+                  <span className="text-sm text-slate-500">{registeredClients.length} registered</span>
+                </div>
+
+                {role === "ADMIN" ? (
+                  <div className="mb-4 rounded-md border border-line bg-slate-50 p-3">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="font-semibold">{editingRegistered ? "Edit Client" : "Add Client"}</div>
+                      {editingRegistered ? (
+                        <button className="inline-flex h-8 items-center gap-1 rounded-md border border-line bg-white px-2 text-xs font-semibold" onClick={resetRegisteredForm}>
+                          <X size={14} /> Cancel
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <label className="text-sm">
+                        <span className="mb-1 block text-slate-600">Client Name</span>
+                        <input className="h-10 w-full rounded-md border border-line bg-white px-3" name="device_name" value={registeredForm.device_name} onChange={changeRegisteredForm} />
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-slate-600">IP Address</span>
+                        <input className="h-10 w-full rounded-md border border-line bg-white px-3" name="ip_address" value={registeredForm.ip_address} onChange={changeRegisteredForm} />
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-slate-600">MAC</span>
+                        <input className="h-10 w-full rounded-md border border-line bg-white px-3" name="mac_address" value={registeredForm.mac_address} onChange={changeRegisteredForm} />
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-slate-600">Hostname</span>
+                        <input className="h-10 w-full rounded-md border border-line bg-white px-3" name="hostname" value={registeredForm.hostname} onChange={changeRegisteredForm} />
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-slate-600">Type</span>
+                        <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="device_type" value={registeredForm.device_type} onChange={changeRegisteredForm}>
+                          {["WORKSTATION", "IOT", "HMI", "PLC", "SCANNER", "CAMERA", "PRINTER", "SENSOR", "OTHER"].map((value) => (
+                            <option key={value} value={value}>{value}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-slate-600">VLAN</span>
+                        <input className="h-10 w-full rounded-md border border-line bg-white px-3" name="vlan" type="number" value={registeredForm.vlan} onChange={changeRegisteredForm} />
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-slate-600">Criticality</span>
+                        <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="criticality" value={registeredForm.criticality} onChange={changeRegisteredForm}>
+                          {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((value) => (
+                            <option key={value} value={value}>{value}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-slate-600">Owner</span>
+                        <input className="h-10 w-full rounded-md border border-line bg-white px-3" name="owner_department" value={registeredForm.owner_department} onChange={changeRegisteredForm} />
+                      </label>
+                      <label className="text-sm md:col-span-2 xl:col-span-3">
+                        <span className="mb-1 block text-slate-600">Notes</span>
+                        <input className="h-10 w-full rounded-md border border-line bg-white px-3" name="notes" value={registeredForm.notes} onChange={changeRegisteredForm} />
+                      </label>
+                      <label className="flex items-end gap-2 pb-2 text-sm">
+                        <input type="checkbox" name="monitoring_enabled" checked={Boolean(registeredForm.monitoring_enabled)} onChange={changeRegisteredForm} />
+                        Monitoring enabled
+                      </label>
+                    </div>
+                    <div className="mt-3 flex flex-wrap justify-end gap-2">
+                      <button className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-3 text-sm font-semibold text-white" onClick={saveRegisteredClient}>
+                        {editingRegistered ? <Save size={16} /> : <Plus size={16} />} {editingRegistered ? "Save Client" : "Add Client"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="table-scroll overflow-auto rounded-md border border-line">
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="bg-slate-100 text-xs uppercase text-slate-600">
+                      <tr>
+                        <th className="px-3 py-2">Client</th>
+                        <th className="px-3 py-2">IP</th>
+                        <th className="px-3 py-2">MAC</th>
+                        <th className="px-3 py-2">Type</th>
+                        <th className="px-3 py-2">Criticality</th>
+                        <th className="px-3 py-2">Monitor</th>
+                        {role === "ADMIN" ? <th className="px-3 py-2 text-right">Actions</th> : null}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {registeredClients.map((client) => (
+                        <tr key={client.id} className="border-t border-line">
+                          <td className="px-3 py-2">
+                            <div className="font-semibold text-ink">{client.device_name}</div>
+                            <div className="text-xs text-slate-500">{valueOrDash(client.hostname)}</div>
+                          </td>
+                          <td className="px-3 py-2 tabular-nums">{client.ip_address}</td>
+                          <td className="px-3 py-2 tabular-nums">{valueOrDash(client.mac_address)}</td>
+                          <td className="px-3 py-2">{client.device_type}</td>
+                          <td className="px-3 py-2">{client.criticality}</td>
+                          <td className="px-3 py-2">{client.monitoring_enabled ? "ON" : "OFF"}</td>
+                          {role === "ADMIN" ? (
+                            <td className="px-3 py-2 text-right">
+                              <button className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white text-slate-700" title="Edit" onClick={() => editRegisteredClient(client)}>
+                                <Edit3 size={14} />
+                              </button>
+                              <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white text-red-700" title="Delete" onClick={() => deleteRegisteredClient(client)}>
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          ) : null}
+                        </tr>
+                      ))}
+                      {!registeredClients.length ? (
+                        <tr><td colSpan={role === "ADMIN" ? 7 : 6} className="px-3 py-8 text-center text-slate-500">No registered AP clients</td></tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
               <section className="rounded-md border border-line bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b border-line px-4 py-3">
                   <h2 className="font-semibold">Connected Clients</h2>
@@ -246,6 +480,7 @@ export default function APClientDiscoveryPage({ role }) {
                         <th className="px-3 py-2">VLAN</th>
                         <th className="px-3 py-2">RSSI</th>
                         <th className="px-3 py-2">Last Seen</th>
+                        {role === "ADMIN" ? <th className="px-3 py-2 text-right">Actions</th> : null}
                       </tr>
                     </thead>
                     <tbody>
@@ -259,10 +494,21 @@ export default function APClientDiscoveryPage({ role }) {
                           <td className="px-3 py-2">{valueOrDash(client.vlan)}</td>
                           <td className="px-3 py-2">{valueOrDash(client.rssi)}</td>
                           <td className="px-3 py-2">{valueOrDash(client.last_seen)}</td>
+                          {role === "ADMIN" ? (
+                            <td className="px-3 py-2 text-right">
+                              {!client.is_known_device ? (
+                                <button className="inline-flex h-8 items-center gap-1 rounded-md border border-line bg-white px-2 text-xs font-semibold text-cyan-800" onClick={() => registerObservedClient(client)}>
+                                  <Plus size={13} /> Register
+                                </button>
+                              ) : (
+                                <span className="text-xs font-semibold text-green-700">Known</span>
+                              )}
+                            </td>
+                          ) : null}
                         </tr>
                       ))}
                       {!clients.length ? (
-                        <tr><td colSpan="8" className="px-3 py-8 text-center text-slate-500">No connected clients discovered</td></tr>
+                        <tr><td colSpan={role === "ADMIN" ? 9 : 8} className="px-3 py-8 text-center text-slate-500">No connected clients discovered</td></tr>
                       ) : null}
                     </tbody>
                   </table>
