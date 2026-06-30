@@ -202,7 +202,7 @@ export default function DeviceDetailPanel({ device }) {
         />
         <MetricTile
           icon={Activity}
-          label="Loss"
+          label="ICMP Loss"
           value={loss != null ? `${loss}%` : "-"}
           tone={metricTone("loss", loss)}
         />
@@ -242,9 +242,11 @@ export default function DeviceDetailPanel({ device }) {
 
         <Section title="Monitoring">
           <div className="rounded-md border border-line px-3">
+            <DetailRow label="Method" value={device.latest_check_method} />
             <DetailRow label="Latency" value={latency != null ? `${latency} ms` : "-"} />
-            <DetailRow label="Packet Loss" value={loss != null ? `${loss}%` : "-"} />
+            <DetailRow label="ICMP Loss" value={loss != null ? `${loss}%` : "-"} />
             <DetailRow label="Failures" value={failures} />
+            <DetailRow label="Reason" value={device.latest_monitoring_reason} />
           </div>
         </Section>
       </div>

@@ -64,7 +64,7 @@ function DeviceHoverPreview({ device, position }) {
 
   return (
     <div
-      className="pointer-events-none fixed z-30 w-[820px] max-w-[calc(100vw-32px)] rounded-md border border-line bg-white p-4 text-left shadow-2xl"
+      className="pointer-events-none fixed z-30 max-h-[calc(100vh-32px)] w-[820px] max-w-[calc(100vw-32px)] overflow-auto rounded-md border border-line bg-white p-4 text-left shadow-2xl"
       style={{ left: position.left, top: position.top }}
     >
       <div className="mb-3 flex items-start justify-between gap-3">
@@ -92,8 +92,9 @@ function DeviceHoverPreview({ device, position }) {
           <PreviewSection title="Monitoring">
             <PreviewField label="Status" value={device.status} />
             <PreviewField label="Level" value={device.criticality} />
+            <PreviewField label="Method" value={device.latest_check_method} />
             <PreviewField label="Latency" value={device.latency_ms != null ? `${device.latency_ms} ms` : "-"} />
-            <PreviewField label="Loss" value={device.packet_loss_percent != null ? `${device.packet_loss_percent}%` : "-"} />
+            <PreviewField label="ICMP Loss" value={device.packet_loss_percent != null ? `${device.packet_loss_percent}%` : "-"} />
             <PreviewField label="Fail" value={device.consecutive_failure_count} />
             <PreviewField label="Alerts" value={device.active_alert_count} />
             <PreviewField label="Monitor" value={boolText(device.monitoring_enabled)} />
@@ -121,8 +122,8 @@ function DeviceHoverPreview({ device, position }) {
         </div>
 
         <div className="rounded-md border border-line bg-slate-50 px-3 py-2">
-          <div className="text-[11px] font-semibold uppercase tracking-normal text-slate-500">Notes</div>
-          <div className="break-words text-xs font-medium leading-snug text-ink">{valueOrDash(device.notes)}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-normal text-slate-500">Latest Reason</div>
+          <div className="break-words text-xs font-medium leading-snug text-ink">{valueOrDash(device.latest_monitoring_reason || device.notes)}</div>
         </div>
       </div>
     </div>
@@ -163,7 +164,7 @@ export default function DeviceTable({ devices = [], selectedId, onSelect, action
             <th className="px-3 py-2">Line</th>
             <th className="px-3 py-2">AP</th>
             <th className="px-3 py-2">Switch</th>
-            <th className="px-3 py-2">Loss</th>
+            <th className="px-3 py-2">ICMP Loss</th>
             {actions ? <th className="px-3 py-2 text-right">Actions</th> : null}
           </tr>
         </thead>

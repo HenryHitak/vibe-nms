@@ -54,6 +54,26 @@ NMS_DATABASE_ENGINE=sqlite
 NMS_DATABASE_PATH=C:\Program Files\Vibe NMS\data\nms.sqlite
 ```
 
+The installer writes the detected company LAN ranges to:
+
+```text
+NMS_CORPORATE_NETWORKS=...
+```
+
+If devices use another internal range, add it here. Example:
+
+```text
+NMS_CORPORATE_NETWORKS=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,105.102.0.0/16
+```
+
+Monitoring uses ICMP ping first. If a Windows PC blocks ping but is still reachable, Vibe NMS checks these backend-only TCP fallback ports:
+
+```text
+NMS_TCP_FALLBACK_PORTS=445,3389,80,443
+```
+
+If one fallback port responds, the device is marked `ONLINE` and Monitoring Logs show method `PING+TCP`.
+
 For MS SQL Server, change the database settings in `.env`:
 
 ```text

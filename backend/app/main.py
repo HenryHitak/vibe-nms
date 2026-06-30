@@ -362,8 +362,19 @@ def list_devices(
         rows = conn.execute(
             f"""
             SELECT d.*,
-                   (SELECT COUNT(*) FROM alerts a WHERE a.device_id = d.id AND a.status = 'ACTIVE') AS active_alert_count
+                   (SELECT COUNT(*) FROM alerts a WHERE a.device_id = d.id AND a.status = 'ACTIVE') AS active_alert_count,
+                   latest.check_method AS latest_check_method,
+                   latest.error_message AS latest_monitoring_reason
             FROM network_devices d
+            LEFT JOIN (
+                SELECT device_id, check_method, error_message
+                FROM (
+                    SELECT device_id, check_method, error_message,
+                           ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY checked_at DESC, id DESC) AS rn
+                    FROM device_metrics
+                ) ranked_metrics
+                WHERE rn = 1
+            ) latest ON latest.device_id = d.id
             {where}
             ORDER BY COALESCE(d.plant_name, d.plant_code), COALESCE(d.line_name, d.line_code), d.device_name
             """,
@@ -378,8 +389,19 @@ def get_device_detail(device_id: int, actor: Actor = Depends(get_actor)) -> dict
         row = conn.execute(
             """
             SELECT d.*,
-                   (SELECT COUNT(*) FROM alerts a WHERE a.device_id = d.id AND a.status = 'ACTIVE') AS active_alert_count
+                   (SELECT COUNT(*) FROM alerts a WHERE a.device_id = d.id AND a.status = 'ACTIVE') AS active_alert_count,
+                   latest.check_method AS latest_check_method,
+                   latest.error_message AS latest_monitoring_reason
             FROM network_devices d
+            LEFT JOIN (
+                SELECT device_id, check_method, error_message
+                FROM (
+                    SELECT device_id, check_method, error_message,
+                           ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY checked_at DESC, id DESC) AS rn
+                    FROM device_metrics
+                ) ranked_metrics
+                WHERE rn = 1
+            ) latest ON latest.device_id = d.id
             WHERE d.id = ?
             """,
             (device_id,),
@@ -747,6 +769,7 @@ def monitoring_logs(
             "runs": rows_to_dicts(runs),
             "thresholds": {
                 "ping_count": settings.ping_count,
+                "tcp_fallback_ports": settings.tcp_fallback_ports,
                 "collector_timeout_ms": settings.collector_timeout_ms,
                 "warning_latency_ms": settings.warning_latency_ms,
                 "critical_latency_ms": settings.critical_latency_ms,

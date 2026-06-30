@@ -8,6 +8,7 @@ const KNOWN_KEYS = [
   "warning_latency_ms",
   "critical_latency_ms",
   "warning_packet_loss_percent",
+  "tcp_fallback_ports",
   "corporate_networks"
 ];
 
@@ -66,4 +67,3 @@ export default function SystemSettingsPage() {
     </AdminLayout>
   );
 }
-

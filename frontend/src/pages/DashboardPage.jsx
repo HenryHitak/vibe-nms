@@ -150,7 +150,7 @@ export default function DashboardPage() {
       .map((row, index) => ({
       index: index + 1,
       latency: row.latency_ms ?? 0,
-      loss: row.packet_loss_percent ?? 0,
+      icmpLoss: row.packet_loss_percent ?? 0,
       device: row.device_name
     })),
     [summary, plantFilter, lineFilter]
@@ -282,7 +282,7 @@ export default function DashboardPage() {
                   <YAxis yAxisId="right" orientation="right" />
                   <Tooltip />
                   <Line yAxisId="left" type="monotone" dataKey="latency" stroke="#0e7490" strokeWidth={2} dot={false} />
-                  <Line yAxisId="right" type="monotone" dataKey="loss" stroke="#dc2626" strokeWidth={2} dot={false} />
+                  <Line yAxisId="right" type="monotone" dataKey="icmpLoss" name="ICMP Loss" stroke="#dc2626" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

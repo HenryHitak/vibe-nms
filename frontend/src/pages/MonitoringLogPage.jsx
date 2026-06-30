@@ -22,18 +22,19 @@ function reasonForLog(log, thresholds = {}) {
   const failures = Number(log.consecutive_failure_count || 0);
   const latency = Number(log.latency_ms ?? 0);
   const loss = Number(log.packet_loss_percent ?? 0);
+  const fallbackPorts = Array.isArray(thresholds.tcp_fallback_ports) ? thresholds.tcp_fallback_ports.join(", ") : "configured TCP ports";
 
   if (log.status === "FLAPPING") {
     return "Status changed repeatedly in recent checks. Check cable, switch port, Wi-Fi roaming, or unstable ICMP response.";
   }
   if (!log.is_online) {
     if (failures < 3) {
-      return `Ping failed ${failures || 1} time(s). Device may still be online if ICMP/ping is blocked by Windows firewall or endpoint security.`;
+      return `Ping failed ${failures || 1} time(s). Device may still be online if ICMP/ping is blocked; fallback ports checked: ${fallbackPorts}.`;
     }
-    return `Ping failed ${failures} consecutive times. Marked ${log.status}.`;
+    return `Ping failed ${failures} consecutive times. Marked ${log.status}. Check allowed company networks and whether ICMP or fallback TCP ports are blocked.`;
   }
   if (loss >= warningLoss) {
-    return `Online, but packet loss ${loss}% is above warning threshold ${warningLoss}%.`;
+    return `Online, but ICMP loss ${loss}% is above warning threshold ${warningLoss}%.`;
   }
   if (latency >= criticalLatency && log.status === "CRITICAL") {
     return `Online, but latency ${latency} ms is above critical threshold ${criticalLatency} ms.`;
@@ -41,7 +42,7 @@ function reasonForLog(log, thresholds = {}) {
   if (latency >= warningLatency) {
     return `Online, but latency ${latency} ms is above warning threshold ${warningLatency} ms.`;
   }
-  return `Ping OK. Latency ${formatMs(log.latency_ms)}, packet loss ${formatPercent(log.packet_loss_percent)}.`;
+  return `Ping OK. Latency ${formatMs(log.latency_ms)}, ICMP loss ${formatPercent(log.packet_loss_percent)}.`;
 }
 
 export default function MonitoringLogPage() {
@@ -111,7 +112,7 @@ export default function MonitoringLogPage() {
               <th className="px-3 py-2">IP</th>
               <th className="px-3 py-2">Method</th>
               <th className="px-3 py-2">Latency</th>
-              <th className="px-3 py-2">Loss</th>
+              <th className="px-3 py-2">ICMP Loss</th>
               <th className="px-3 py-2">Failures</th>
               <th className="px-3 py-2">Reason</th>
             </tr>

@@ -18,6 +18,9 @@ class ProbeResult:
     latency_ms: float | None
     packet_loss_percent: float
     error_message: str | None = None
+    tcp_fallback_port: int | None = None
+    tcp_fallback_latency_ms: float | None = None
+    tcp_fallback_result: str | None = None
 
 
 async def ping_device(ip_address: str) -> ProbeResult:
@@ -51,7 +54,40 @@ async def ping_device(ip_address: str) -> ProbeResult:
     if parsed_loss is not None:
         packet_loss = parsed_loss
     error = None if is_online else output.strip()[-240:] or "Ping failed"
+    if not is_online and settings.tcp_fallback_ports:
+        tcp_port, tcp_latency, tcp_result = await _tcp_fallback_probe(ip_address)
+        if tcp_port is not None:
+            return ProbeResult(
+                True,
+                tcp_latency,
+                packet_loss,
+                f"ICMP ping did not reply, but TCP port {tcp_port} {tcp_result}. Device is treated as ONLINE.",
+                tcp_port,
+                tcp_latency,
+                tcp_result,
+            )
     return ProbeResult(is_online, latency, packet_loss, error)
+
+
+async def _tcp_fallback_probe(ip_address: str) -> tuple[int | None, float | None, str | None]:
+    timeout_seconds = max(0.5, settings.collector_timeout_ms / 1000)
+    for port in settings.tcp_fallback_ports:
+        started = time.perf_counter()
+        try:
+            _reader, writer = await asyncio.wait_for(asyncio.open_connection(ip_address, port), timeout=timeout_seconds)
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+            latency_ms = round((time.perf_counter() - started) * 1000, 1)
+            return port, latency_ms, "accepted a connection"
+        except ConnectionRefusedError:
+            latency_ms = round((time.perf_counter() - started) * 1000, 1)
+            return port, latency_ms, "refused the connection, which confirms the host is reachable"
+        except Exception:
+            continue
+    return None, None, None
 
 
 def _parse_latency(output: str) -> float | None:
@@ -82,8 +118,20 @@ def status_reason(device: sqlite3.Row, status: str, failures: int, probe: ProbeR
 
     if status == "FLAPPING":
         return "Status changed repeatedly in the last checks. Check unstable cable, switch port, Wi-Fi roaming, or intermittent ICMP response."
+    if probe.tcp_fallback_port is not None:
+        tcp_latency = "-" if probe.tcp_fallback_latency_ms is None else f"{probe.tcp_fallback_latency_ms:g} ms"
+        tcp_result = probe.tcp_fallback_result or "responded"
+        return (
+            f"ICMP ping loss is {loss}, but TCP port {probe.tcp_fallback_port} {tcp_result} "
+            f"({tcp_latency}). Device is reachable and marked ONLINE. If ICMP Loss should be 0%, allow ping in Windows Firewall or endpoint security."
+        )
     if not probe.is_online:
         base = probe.error_message or "Ping did not receive a reply"
+        if "outside configured corporate network ranges" in base:
+            return (
+                f"{device['ip_address']} is outside NMS_CORPORATE_NETWORKS, so the backend did not probe it. "
+                "Add the company IP range in C:\\Program Files\\Vibe NMS\\.env, then restart the VibeNMS scheduled task."
+            )
         if failures < 3:
             return f"Ping failed {failures} time(s). Device may still be powered on if Windows firewall or endpoint security blocks ICMP ping. Raw: {base}"
         if status == "CRITICAL":
@@ -111,6 +159,8 @@ def status_from_probe(device: sqlite3.Row, probe: ProbeResult) -> tuple[str, int
         return "WARNING", failures
 
     failures = 0
+    if probe.tcp_fallback_port is not None:
+        return "ONLINE", failures
     if probe.packet_loss_percent >= settings.warning_packet_loss_percent:
         return "WARNING", failures
     if probe.latency_ms is not None and probe.latency_ms >= settings.critical_latency_ms and criticality in {"HIGH", "CRITICAL"}:
@@ -226,10 +276,11 @@ async def run_monitoring_cycle(conn: sqlite3.Connection | None = None) -> dict[s
                         device_id, check_method, is_online, status, latency_ms,
                         packet_loss_percent, consecutive_failure_count, error_message
                     )
-                    VALUES (?, 'PING', ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         device["id"],
+                        "PING+TCP" if probe.tcp_fallback_port is not None else "PING",
                         1 if probe.is_online else 0,
                         status,
                         probe.latency_ms,

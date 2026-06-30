@@ -232,6 +232,8 @@ NMS_CORPORATE_NETWORKS=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
 NMS_COLLECTOR_ENABLED=true
 NMS_COLLECTOR_INTERVAL_SECONDS=30
 NMS_COLLECTOR_TIMEOUT_MS=1000
+NMS_PING_COUNT=3
+NMS_TCP_FALLBACK_PORTS=445,3389,80,443
 NMS_WARNING_LATENCY_MS=150
 NMS_CRITICAL_LATENCY_MS=500
 NMS_WARNING_PACKET_LOSS_PERCENT=5
@@ -288,6 +290,16 @@ Failure count rules:
 3-4 failures = OFFLINE
 5+ failures = CRITICAL when criticality is HIGH or CRITICAL
 ```
+
+Monitoring uses ICMP ping first. Some company Windows PCs are online but block ICMP ping in Windows Firewall or endpoint security. When ping fails, the backend checks `NMS_TCP_FALLBACK_PORTS`; if one port is reachable, the device is marked `ONLINE` and the log method is `PING+TCP`. The UI label `ICMP Loss` means ping loss only, not necessarily that the PC cannot be used.
+
+If a company uses a non-private internal range such as `105.102.x.x`, add that range to `NMS_CORPORATE_NETWORKS`, for example:
+
+```text
+NMS_CORPORATE_NETWORKS=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,105.102.0.0/16
+```
+
+The Windows installer automatically adds the server PC's detected LAN ranges to `NMS_CORPORATE_NETWORKS`.
 
 ## Backup and Export
 

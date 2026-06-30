@@ -552,6 +552,7 @@ def seed_reference_data(conn: sqlite3.Connection) -> None:
         "warning_latency_ms": str(settings.warning_latency_ms),
         "critical_latency_ms": str(settings.critical_latency_ms),
         "warning_packet_loss_percent": str(settings.warning_packet_loss_percent),
+        "tcp_fallback_ports": ",".join(str(port) for port in settings.tcp_fallback_ports),
         "corporate_networks": ",".join(settings.corporate_networks),
     }
     for key, value in default_settings.items():

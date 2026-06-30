@@ -134,9 +134,82 @@ function Get-AccessUrls {
     $urls | Select-Object -Unique
 }
 
+function Add-UniqueText {
+    param(
+        [System.Collections.Generic.List[string]]$Values,
+        [string]$Value
+    )
+
+    if ($Value -and -not $Values.Contains($Value)) {
+        [void]$Values.Add($Value)
+    }
+}
+
+function Get-MonitoringNetworks {
+    $networks = [System.Collections.Generic.List[string]]::new()
+    foreach ($network in @("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")) {
+        Add-UniqueText -Values $networks -Value $network
+    }
+
+    try {
+        $addresses = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
+            Where-Object {
+                $_.IPAddress -and
+                $_.IPAddress -notlike "127.*" -and
+                $_.IPAddress -notlike "169.254.*" -and
+                $_.IPAddress -notlike "0.*"
+            } |
+            Sort-Object InterfaceMetric, InterfaceIndex
+        foreach ($address in $addresses) {
+            if ($address.PrefixLength -gt 0 -and $address.PrefixLength -le 32) {
+                Add-UniqueText -Values $networks -Value "$($address.IPAddress)/$($address.PrefixLength)"
+            }
+            if ($address.IPAddress -match "^(\d+)\.(\d+)\.") {
+                Add-UniqueText -Values $networks -Value "$($Matches[1]).$($Matches[2]).0.0/16"
+            }
+        }
+    } catch {
+        foreach ($address in Get-LanIPv4Addresses) {
+            if ($address -match "^(\d+)\.(\d+)\.") {
+                Add-UniqueText -Values $networks -Value "$($Matches[1]).$($Matches[2]).0.0/16"
+            }
+        }
+    }
+
+    $networks.ToArray() -join ","
+}
+
+function Get-EnvValue {
+    param(
+        [string[]]$Lines,
+        [string]$Key
+    )
+
+    foreach ($line in $Lines) {
+        if ($line -match "^$([regex]::Escape($Key))=(.*)$") {
+            return $Matches[1]
+        }
+    }
+    return ""
+}
+
+function Merge-CsvValues {
+    param(
+        [string]$Existing,
+        [string]$Additional
+    )
+
+    $values = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in (($Existing, $Additional) -join "," -split ",")) {
+        Add-UniqueText -Values $values -Value $item.Trim()
+    }
+    $values.ToArray() -join ","
+}
+
 Stop-ExistingTask -TaskName $taskName
 Stop-VibeNmsPortListeners -Port $Port -InstallDir $InstallDir -PackageRoot $packageRoot
 $accessUrls = @(Get-AccessUrls -Port $Port)
+$corporateNetworks = Get-MonitoringNetworks
 
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $InstallDir "data") -Force | Out-Null
@@ -164,8 +237,10 @@ NMS_DATABASE_ENGINE=sqlite
 NMS_DATABASE_PATH=$InstallDir\data\nms.sqlite
 NMS_FRONTEND_DIST=$InstallDir\frontend\dist
 NMS_ALLOWED_ORIGINS=$allowedOrigins
+NMS_CORPORATE_NETWORKS=$corporateNetworks
 NMS_COLLECTOR_ENABLED=true
 NMS_PING_COUNT=3
+NMS_TCP_FALLBACK_PORTS=445,3389,80,443
 NMS_AP_CLIENT_DISCOVERY_ENABLED=true
 NMS_AP_CLIENT_DEFAULT_PROVIDER=demo
 NMS_BOOTSTRAP_ADMIN_USERNAME=admin
@@ -174,12 +249,15 @@ NMS_AUTH_SECRET=change-this-to-a-long-random-secret
 "@ | Set-Content -LiteralPath $envPath -Encoding UTF8
 } else {
     $envLines = Get-Content -LiteralPath $envPath
+    $existingCorporateNetworks = Get-EnvValue -Lines $envLines -Key "NMS_CORPORATE_NETWORKS"
     $managedValues = @{
         "NMS_PORT" = "$Port"
         "NMS_DATABASE_PATH" = "$InstallDir\data\nms.sqlite"
         "NMS_FRONTEND_DIST" = "$InstallDir\frontend\dist"
         "NMS_ALLOWED_ORIGINS" = ($accessUrls -join ",")
+        "NMS_CORPORATE_NETWORKS" = (Merge-CsvValues -Existing $existingCorporateNetworks -Additional $corporateNetworks)
         "NMS_PING_COUNT" = "3"
+        "NMS_TCP_FALLBACK_PORTS" = "445,3389,80,443"
     }
     foreach ($key in $managedValues.Keys) {
         $value = $managedValues[$key]
