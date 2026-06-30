@@ -34,6 +34,7 @@ class Settings:
     collector_enabled = _bool(os.getenv("NMS_COLLECTOR_ENABLED"), True)
     collector_interval_seconds = int(os.getenv("NMS_COLLECTOR_INTERVAL_SECONDS", "30"))
     collector_timeout_ms = int(os.getenv("NMS_COLLECTOR_TIMEOUT_MS", "1000"))
+    ping_count = max(1, int(os.getenv("NMS_PING_COUNT", "3")))
     warning_latency_ms = float(os.getenv("NMS_WARNING_LATENCY_MS", "150"))
     critical_latency_ms = float(os.getenv("NMS_CRITICAL_LATENCY_MS", "500"))
     warning_packet_loss_percent = float(os.getenv("NMS_WARNING_PACKET_LOSS_PERCENT", "5"))

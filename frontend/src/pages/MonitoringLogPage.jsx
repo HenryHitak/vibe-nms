@@ -4,8 +4,48 @@ import { api } from "../api.js";
 import AdminLayout from "../components/AdminLayout.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 
+function formatMs(value) {
+  return value == null ? "-" : `${value} ms`;
+}
+
+function formatPercent(value) {
+  return value == null ? "-" : `${value}%`;
+}
+
+function reasonForLog(log, thresholds = {}) {
+  if (log.error_message) {
+    return log.error_message;
+  }
+  const warningLatency = Number(thresholds.warning_latency_ms ?? 150);
+  const criticalLatency = Number(thresholds.critical_latency_ms ?? 500);
+  const warningLoss = Number(thresholds.warning_packet_loss_percent ?? 5);
+  const failures = Number(log.consecutive_failure_count || 0);
+  const latency = Number(log.latency_ms ?? 0);
+  const loss = Number(log.packet_loss_percent ?? 0);
+
+  if (log.status === "FLAPPING") {
+    return "Status changed repeatedly in recent checks. Check cable, switch port, Wi-Fi roaming, or unstable ICMP response.";
+  }
+  if (!log.is_online) {
+    if (failures < 3) {
+      return `Ping failed ${failures || 1} time(s). Device may still be online if ICMP/ping is blocked by Windows firewall or endpoint security.`;
+    }
+    return `Ping failed ${failures} consecutive times. Marked ${log.status}.`;
+  }
+  if (loss >= warningLoss) {
+    return `Online, but packet loss ${loss}% is above warning threshold ${warningLoss}%.`;
+  }
+  if (latency >= criticalLatency && log.status === "CRITICAL") {
+    return `Online, but latency ${latency} ms is above critical threshold ${criticalLatency} ms.`;
+  }
+  if (latency >= warningLatency) {
+    return `Online, but latency ${latency} ms is above warning threshold ${warningLatency} ms.`;
+  }
+  return `Ping OK. Latency ${formatMs(log.latency_ms)}, packet loss ${formatPercent(log.packet_loss_percent)}.`;
+}
+
 export default function MonitoringLogPage() {
-  const [payload, setPayload] = useState({ logs: [], runs: [] });
+  const [payload, setPayload] = useState({ logs: [], runs: [], thresholds: {} });
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
 
@@ -73,7 +113,7 @@ export default function MonitoringLogPage() {
               <th className="px-3 py-2">Latency</th>
               <th className="px-3 py-2">Loss</th>
               <th className="px-3 py-2">Failures</th>
-              <th className="px-3 py-2">Error</th>
+              <th className="px-3 py-2">Reason</th>
             </tr>
           </thead>
           <tbody>
@@ -84,10 +124,10 @@ export default function MonitoringLogPage() {
                 <td className="px-3 py-2 font-semibold">{log.device_name}</td>
                 <td className="px-3 py-2 tabular-nums">{log.ip_address}</td>
                 <td className="px-3 py-2">{log.check_method}</td>
-                <td className="px-3 py-2 tabular-nums">{log.latency_ms ?? "-"}</td>
-                <td className="px-3 py-2 tabular-nums">{log.packet_loss_percent ?? "-"}</td>
+                <td className="px-3 py-2 tabular-nums">{formatMs(log.latency_ms)}</td>
+                <td className="px-3 py-2 tabular-nums">{formatPercent(log.packet_loss_percent)}</td>
                 <td className="px-3 py-2 tabular-nums">{log.consecutive_failure_count}</td>
-                <td className="max-w-[360px] px-3 py-2 text-xs text-slate-600">{log.error_message || "-"}</td>
+                <td className="min-w-[360px] max-w-[560px] px-3 py-2 text-xs leading-5 text-slate-700">{reasonForLog(log, payload.thresholds)}</td>
               </tr>
             ))}
             {payload.logs.length === 0 ? (
@@ -99,4 +139,3 @@ export default function MonitoringLogPage() {
     </AdminLayout>
   );
 }
-

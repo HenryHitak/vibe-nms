@@ -26,10 +26,10 @@ async def ping_device(ip_address: str) -> ProbeResult:
 
     system = platform.system().lower()
     if "windows" in system:
-        args = ["ping", "-n", "1", "-w", str(settings.collector_timeout_ms), ip_address]
+        args = ["ping", "-n", str(settings.ping_count), "-w", str(settings.collector_timeout_ms), ip_address]
     else:
         timeout_seconds = max(1, int(settings.collector_timeout_ms / 1000))
-        args = ["ping", "-c", "1", "-W", str(timeout_seconds), ip_address]
+        args = ["ping", "-c", str(settings.ping_count), "-W", str(timeout_seconds), ip_address]
 
     try:
         process = await asyncio.create_subprocess_exec(
@@ -58,6 +58,7 @@ def _parse_latency(output: str) -> float | None:
     patterns = [
         r"time[=<]\s*(\d+(?:\.\d+)?)\s*ms",
         r"Average\s*=\s*(\d+(?:\.\d+)?)ms",
+        r"평균\s*=\s*(\d+(?:\.\d+)?)ms",
         r"avg[/=]\s*(\d+(?:\.\d+)?)",
     ]
     for pattern in patterns:
@@ -68,10 +69,33 @@ def _parse_latency(output: str) -> float | None:
 
 
 def _parse_packet_loss(output: str) -> float | None:
-    match = re.search(r"(\d+(?:\.\d+)?)%\s*loss", output, flags=re.IGNORECASE)
+    match = re.search(r"(\d+(?:\.\d+)?)%\s*(?:loss|손실)", output, flags=re.IGNORECASE)
     if match:
         return float(match.group(1))
     return None
+
+
+def status_reason(device: sqlite3.Row, status: str, failures: int, probe: ProbeResult) -> str:
+    criticality = (device["criticality"] or "MEDIUM").upper()
+    latency = "-" if probe.latency_ms is None else f"{probe.latency_ms:g} ms"
+    loss = f"{probe.packet_loss_percent:g}%"
+
+    if status == "FLAPPING":
+        return "Status changed repeatedly in the last checks. Check unstable cable, switch port, Wi-Fi roaming, or intermittent ICMP response."
+    if not probe.is_online:
+        base = probe.error_message or "Ping did not receive a reply"
+        if failures < 3:
+            return f"Ping failed {failures} time(s). Device may still be powered on if Windows firewall or endpoint security blocks ICMP ping. Raw: {base}"
+        if status == "CRITICAL":
+            return f"Ping failed {failures} consecutive times on a {criticality} device. Marked CRITICAL. Raw: {base}"
+        return f"Ping failed {failures} consecutive times. Marked {status}. Raw: {base}"
+    if probe.packet_loss_percent >= settings.warning_packet_loss_percent:
+        return f"Ping replies were received, but packet loss is {loss}, above warning threshold {settings.warning_packet_loss_percent:g}%."
+    if probe.latency_ms is not None and probe.latency_ms >= settings.critical_latency_ms and criticality in {"HIGH", "CRITICAL"}:
+        return f"Ping replies were received, but latency is {latency}, above critical threshold {settings.critical_latency_ms:g} ms for a {criticality} device."
+    if probe.latency_ms is not None and probe.latency_ms >= settings.warning_latency_ms:
+        return f"Ping replies were received, but latency is {latency}, above warning threshold {settings.warning_latency_ms:g} ms."
+    return f"Ping OK. Latency {latency}, packet loss {loss}."
 
 
 def status_from_probe(device: sqlite3.Row, probe: ProbeResult) -> tuple[str, int]:
@@ -114,7 +138,14 @@ def detect_flapping(conn: sqlite3.Connection, device_id: int, new_status: str) -
     return changes >= 4
 
 
-def upsert_alert_for_status(conn: sqlite3.Connection, device: sqlite3.Row, status: str, probe: ProbeResult) -> None:
+def upsert_alert_for_status(
+    conn: sqlite3.Connection,
+    device: sqlite3.Row,
+    status: str,
+    probe: ProbeResult,
+    failures: int,
+    reason: str,
+) -> None:
     if status in {"ONLINE", "UNKNOWN", "DISABLED"}:
         conn.execute(
             """
@@ -127,8 +158,13 @@ def upsert_alert_for_status(conn: sqlite3.Connection, device: sqlite3.Row, statu
         return
 
     severity = "CRITICAL" if status == "CRITICAL" else "WARNING"
-    alert_type = "LATENCY" if probe.is_online and probe.latency_ms and probe.latency_ms >= settings.warning_latency_ms else status
-    message = f"{device['device_name']} ({device['ip_address']}) status is {status}"
+    if probe.is_online and probe.packet_loss_percent >= settings.warning_packet_loss_percent:
+        alert_type = "PACKET_LOSS"
+    elif probe.is_online and probe.latency_ms and probe.latency_ms >= settings.warning_latency_ms:
+        alert_type = "LATENCY"
+    else:
+        alert_type = status
+    message = f"{device['device_name']} ({device['ip_address']}) status is {status}. {reason}"
     existing = conn.execute(
         """
         SELECT * FROM alerts
@@ -183,6 +219,7 @@ async def run_monitoring_cycle(conn: sqlite3.Connection | None = None) -> dict[s
                 status, failures = status_from_probe(device, probe)
                 if detect_flapping(conn, device["id"], status):
                     status = "FLAPPING"
+                reason = status_reason(device, status, failures, probe)
                 conn.execute(
                     """
                     INSERT INTO device_metrics(
@@ -198,7 +235,7 @@ async def run_monitoring_cycle(conn: sqlite3.Connection | None = None) -> dict[s
                         probe.latency_ms,
                         probe.packet_loss_percent,
                         failures,
-                        probe.error_message,
+                        reason,
                     ),
                 )
                 conn.execute(
@@ -210,7 +247,7 @@ async def run_monitoring_cycle(conn: sqlite3.Connection | None = None) -> dict[s
                     """,
                     (status, probe.latency_ms, probe.packet_loss_percent, failures, device["id"]),
                 )
-                upsert_alert_for_status(conn, device, status, probe)
+                upsert_alert_for_status(conn, device, status, probe, failures, reason)
                 if status == "ONLINE":
                     counts["online"] += 1
                 elif status in {"WARNING", "UNCERTAIN", "FLAPPING"}:

@@ -165,6 +165,7 @@ NMS_DATABASE_PATH=$InstallDir\data\nms.sqlite
 NMS_FRONTEND_DIST=$InstallDir\frontend\dist
 NMS_ALLOWED_ORIGINS=$allowedOrigins
 NMS_COLLECTOR_ENABLED=true
+NMS_PING_COUNT=3
 NMS_AP_CLIENT_DISCOVERY_ENABLED=true
 NMS_AP_CLIENT_DEFAULT_PROVIDER=demo
 NMS_BOOTSTRAP_ADMIN_USERNAME=admin
@@ -178,6 +179,7 @@ NMS_AUTH_SECRET=change-this-to-a-long-random-secret
         "NMS_DATABASE_PATH" = "$InstallDir\data\nms.sqlite"
         "NMS_FRONTEND_DIST" = "$InstallDir\frontend\dist"
         "NMS_ALLOWED_ORIGINS" = ($accessUrls -join ",")
+        "NMS_PING_COUNT" = "3"
     }
     foreach ($key in $managedValues.Keys) {
         $value = $managedValues[$key]

@@ -742,7 +742,17 @@ def monitoring_logs(
             params,
         ).fetchall()
         runs = conn.execute("SELECT * FROM monitoring_runs ORDER BY started_at DESC, id DESC LIMIT 50").fetchall()
-        return {"logs": rows_to_dicts(rows), "runs": rows_to_dicts(runs)}
+        return {
+            "logs": rows_to_dicts(rows),
+            "runs": rows_to_dicts(runs),
+            "thresholds": {
+                "ping_count": settings.ping_count,
+                "collector_timeout_ms": settings.collector_timeout_ms,
+                "warning_latency_ms": settings.warning_latency_ms,
+                "critical_latency_ms": settings.critical_latency_ms,
+                "warning_packet_loss_percent": settings.warning_packet_loss_percent,
+            },
+        }
 
 
 @app.post("/api/monitoring/run-once")
