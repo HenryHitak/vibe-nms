@@ -64,10 +64,44 @@ Copy-Item -Path (Join-Path $backendDir "dist\vibe-nms-server\*") -Destination (J
 Copy-Item -LiteralPath (Join-Path $frontendDir "dist") -Destination (Join-Path $packageDir "frontend\dist") -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $root "installer\windows\install.ps1") -Destination (Join-Path $packageDir "installer\install.ps1") -Force
 Copy-Item -LiteralPath (Join-Path $root "installer\windows\uninstall.ps1") -Destination (Join-Path $packageDir "installer\uninstall.ps1") -Force
-Copy-Item -LiteralPath (Join-Path $root "installer\windows\Install Vibe NMS.cmd") -Destination (Join-Path $packageDir "Install Vibe NMS.cmd") -Force
-Copy-Item -LiteralPath (Join-Path $root "installer\windows\Uninstall Vibe NMS.cmd") -Destination (Join-Path $packageDir "Uninstall Vibe NMS.cmd") -Force
 Copy-Item -LiteralPath (Join-Path $root "installer\windows\service\run-vibe-nms.ps1") -Destination (Join-Path $packageDir "service\run-vibe-nms.ps1") -Force
 Copy-Item -LiteralPath (Join-Path $root "installer\windows\README-INSTALLER.md") -Destination (Join-Path $packageDir "README-INSTALLER.md") -Force
+
+@'
+@echo off
+setlocal
+
+net session >nul 2>&1
+if not "%errorlevel%"=="0" (
+    echo Requesting administrator permission...
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+    exit /b
+)
+
+cd /d "%~dp0"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\install.ps1"
+
+echo.
+pause
+'@ | Set-Content -LiteralPath (Join-Path $packageDir "Install Vibe NMS.cmd") -Encoding ASCII
+
+@'
+@echo off
+setlocal
+
+net session >nul 2>&1
+if not "%errorlevel%"=="0" (
+    echo Requesting administrator permission...
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+    exit /b
+)
+
+cd /d "%~dp0"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\uninstall.ps1"
+
+echo.
+pause
+'@ | Set-Content -LiteralPath (Join-Path $packageDir "Uninstall Vibe NMS.cmd") -Encoding ASCII
 
 Compress-Archive -Path (Join-Path $packageDir "*") -DestinationPath $zipPath -Force
 Write-Host "Created $zipPath"

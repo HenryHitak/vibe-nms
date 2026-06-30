@@ -2,9 +2,11 @@
 
 This package runs Vibe NMS without Docker.
 
+Use the GitHub Release asset named `vibe-nms-windows-installer.zip`. Do not use GitHub `Code > Download ZIP` as the installer.
+
 ## Install
 
-Extract the zip, then run:
+Extract `vibe-nms-windows-installer.zip`, then run the root file:
 
 ```text
 Install Vibe NMS.cmd

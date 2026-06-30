@@ -96,7 +96,9 @@ This creates:
 vibe-nms-windows-installer.zip
 ```
 
-On the target PC, extract the zip and run:
+Do not use GitHub `Code > Download ZIP` as the installer. Use the release asset named `vibe-nms-windows-installer.zip`.
+
+On the target PC, extract `vibe-nms-windows-installer.zip` and run the root file:
 
 ```text
 Install Vibe NMS.cmd
