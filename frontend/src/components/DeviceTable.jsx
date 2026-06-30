@@ -1,5 +1,6 @@
 import { useState } from "react";
 import StatusBadge from "./StatusBadge.jsx";
+import { formatTijuanaDateTime } from "../time.js";
 
 const PREVIEW_WIDTH = 820;
 const PREVIEW_HEIGHT = 460;
@@ -115,9 +116,9 @@ function DeviceHoverPreview({ device, position }) {
             <PreviewField label="Ctrl ID" value={device.ap_controller_id} />
             <PreviewField label="Owner" value={device.owner_department} />
             <PreviewField label="Up By" value={device.updated_by} />
-            <PreviewField label="Update" value={device.updated_at} />
+            <PreviewField label="Update" value={formatTijuanaDateTime(device.updated_at)} />
             <PreviewField label="Cr By" value={device.created_by} />
-            <PreviewField label="Create" value={device.created_at} />
+            <PreviewField label="Create" value={formatTijuanaDateTime(device.created_at)} />
           </PreviewSection>
         </div>
 

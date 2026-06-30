@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, Monitor, ServerCrash, Wifi } from "lucide-react";
 import StatusBadge from "../components/StatusBadge.jsx";
+import { formatTijuanaNow } from "../time.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
@@ -50,7 +51,7 @@ export default function DisplayDashboardPage() {
         throw new Error(nextPayload?.detail || `Display API failed: ${response.status}`);
       }
       setPayload(nextPayload);
-      setUpdatedAt(new Date().toLocaleString());
+      setUpdatedAt(formatTijuanaNow());
       setError("");
     } catch (err) {
       setError(err.message);

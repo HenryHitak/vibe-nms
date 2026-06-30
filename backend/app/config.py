@@ -71,6 +71,7 @@ class Settings:
     auth_secret = os.getenv("NMS_AUTH_SECRET", "change-this-local-development-secret")
     token_ttl_minutes = int(os.getenv("NMS_TOKEN_TTL_MINUTES", "720"))
     display_api_token = os.getenv("NMS_DISPLAY_API_TOKEN", "")
+    time_zone = os.getenv("NMS_TIME_ZONE", "America/Tijuana")
     bootstrap_admin_username = os.getenv("NMS_BOOTSTRAP_ADMIN_USERNAME", "admin")
     bootstrap_admin_password = os.getenv("NMS_BOOTSTRAP_ADMIN_PASSWORD", "admin")
     bootstrap_admin_email = os.getenv("NMS_BOOTSTRAP_ADMIN_EMAIL", "admin@example.internal")

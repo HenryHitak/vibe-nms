@@ -32,6 +32,9 @@ if (-not $env:NMS_FRONTEND_DIST) {
 if (-not $env:NMS_PORT) {
     $env:NMS_PORT = "8080"
 }
+if (-not $env:NMS_TIME_ZONE) {
+    $env:NMS_TIME_ZONE = "America/Tijuana"
+}
 
 $port = 8080
 if (-not [int]::TryParse($env:NMS_PORT, [ref]$port)) {

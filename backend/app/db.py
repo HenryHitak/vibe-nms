@@ -131,6 +131,7 @@ class DbConnection:
         if "system_settings" in translated.lower():
             translated = re.sub(r"\bkey\b", "[key]", translated, flags=re.IGNORECASE)
             translated = re.sub(r"\bvalue\b", "[value]", translated, flags=re.IGNORECASE)
+        translated = re.sub(r"\bCURRENT_TIMESTAMP\b", "SYSUTCDATETIME()", translated, flags=re.IGNORECASE)
         translated = re.sub(
             r"\s+LIMIT\s+\?$",
             lambda _match: f" OFFSET 0 ROWS FETCH NEXT {int(params.pop())} ROWS ONLY",

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, RotateCcw } from "lucide-react";
 import { api } from "../api.js";
 import AdminLayout from "../components/AdminLayout.jsx";
+import { formatTijuanaDateTime } from "../time.js";
 
 function Severity({ value }) {
   const classes = value === "CRITICAL" ? "bg-red-900 text-white" : value === "WARNING" ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-700";
@@ -70,7 +71,7 @@ export default function AlertCenter({ role = "USER" }) {
                 <td className="px-3 py-2 font-semibold">{alert.device_name || "-"}</td>
                 <td className="px-3 py-2 tabular-nums">{alert.ip_address || "-"}</td>
                 <td className="px-3 py-2">{alert.message}</td>
-                <td className="px-3 py-2 tabular-nums">{alert.last_detected_at}</td>
+                <td className="px-3 py-2 tabular-nums">{formatTijuanaDateTime(alert.last_detected_at)}</td>
                 <td className="px-3 py-2 text-right">
                   {role === "ADMIN" ? (
                     <div className="inline-flex gap-2">

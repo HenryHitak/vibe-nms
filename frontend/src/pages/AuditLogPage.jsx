@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { api } from "../api.js";
 import AdminLayout from "../components/AdminLayout.jsx";
+import { NMS_TIME_ZONE_LABEL, formatTijuanaDateTime } from "../time.js";
 
 export default function AuditLogPage() {
   const [logs, setLogs] = useState([]);
@@ -50,8 +51,8 @@ export default function AuditLogPage() {
     >
       {error ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
       <div className="mb-4 grid grid-cols-2 gap-3 rounded-md border border-line bg-white p-4 md:grid-cols-4 xl:grid-cols-8">
-        <input className="h-10 rounded-md border border-line px-3 text-sm" type="datetime-local" name="date_from" value={filters.date_from} onChange={change} />
-        <input className="h-10 rounded-md border border-line px-3 text-sm" type="datetime-local" name="date_to" value={filters.date_to} onChange={change} />
+        <input className="h-10 rounded-md border border-line px-3 text-sm" type="datetime-local" name="date_from" value={filters.date_from} onChange={change} title={`From (${NMS_TIME_ZONE_LABEL})`} />
+        <input className="h-10 rounded-md border border-line px-3 text-sm" type="datetime-local" name="date_to" value={filters.date_to} onChange={change} title={`To (${NMS_TIME_ZONE_LABEL})`} />
         <input className="h-10 rounded-md border border-line px-3 text-sm" placeholder="Username" name="username" value={filters.username} onChange={change} />
         <input className="h-10 rounded-md border border-line px-3 text-sm" placeholder="Source IP" name="source_ip" value={filters.source_ip} onChange={change} />
         <select className="h-10 rounded-md border border-line px-3 text-sm" name="action_type" value={filters.action_type} onChange={change}>
@@ -87,7 +88,7 @@ export default function AuditLogPage() {
           <tbody>
             {logs.map((log) => (
               <tr key={log.id} className="border-t border-line align-top">
-                <td className="px-3 py-2 tabular-nums">{log.created_at}</td>
+                <td className="px-3 py-2 tabular-nums">{formatTijuanaDateTime(log.created_at)}</td>
                 <td className="px-3 py-2">{log.actor_username}</td>
                 <td className="px-3 py-2 tabular-nums">{log.actor_ip_address}</td>
                 <td className="px-3 py-2">{log.action_type}</td>
@@ -108,4 +109,3 @@ export default function AuditLogPage() {
     </AdminLayout>
   );
 }
-

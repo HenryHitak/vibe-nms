@@ -43,6 +43,7 @@ def default_paths() -> None:
     if not os.getenv("NMS_FRONTEND_DIST") or not Path(os.getenv("NMS_FRONTEND_DIST", "")).exists():
         os.environ["NMS_FRONTEND_DIST"] = str(frontend_dist)
     os.environ.setdefault("NMS_ALLOWED_ORIGINS", "http://localhost:8080,http://127.0.0.1:8080")
+    os.environ.setdefault("NMS_TIME_ZONE", "America/Tijuana")
     os.environ.setdefault("NMS_BOOTSTRAP_ADMIN_USERNAME", "admin")
     os.environ.setdefault("NMS_BOOTSTRAP_ADMIN_PASSWORD", "admin")
 

@@ -3,6 +3,7 @@ import { Play } from "lucide-react";
 import { api } from "../api.js";
 import AdminLayout from "../components/AdminLayout.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
+import { formatTijuanaDateTime } from "../time.js";
 
 function formatMs(value) {
   return value == null ? "-" : `${value} ms`;
@@ -92,7 +93,7 @@ export default function MonitoringLogPage() {
       <div className="mb-5 grid grid-cols-1 gap-3 xl:grid-cols-4">
         {payload.runs.slice(0, 4).map((run) => (
           <div key={run.id} className="rounded-md border border-line bg-white p-4">
-            <div className="mb-1 text-sm text-slate-500">{run.started_at}</div>
+            <div className="mb-1 text-sm text-slate-500">{formatTijuanaDateTime(run.started_at)}</div>
             <div className="text-sm">
               Checked <span className="font-semibold">{run.total_devices_checked}</span>,
               online <span className="font-semibold text-green-nms">{run.online_count}</span>,
@@ -120,7 +121,7 @@ export default function MonitoringLogPage() {
           <tbody>
             {payload.logs.map((log) => (
               <tr key={log.id} className="border-t border-line">
-                <td className="px-3 py-2 tabular-nums">{log.checked_at}</td>
+                <td className="px-3 py-2 tabular-nums">{formatTijuanaDateTime(log.checked_at)}</td>
                 <td className="px-3 py-2"><StatusBadge status={log.status} /></td>
                 <td className="px-3 py-2 font-semibold">{log.device_name}</td>
                 <td className="px-3 py-2 tabular-nums">{log.ip_address}</td>

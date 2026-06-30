@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Bell, ExternalLink, X } from "lucide-react";
+import { formatTijuanaDateTime } from "../time.js";
 
 export default function AlertBell({ count = 0, notifications = [], onDismiss, onViewAlerts }) {
   const [open, setOpen] = useState(false);
@@ -65,7 +66,7 @@ export default function AlertBell({ count = 0, notifications = [], onDismiss, on
                   <div className="min-w-0">
                     <div className="font-semibold text-ink">{notification.title}</div>
                     <div className="mt-1 text-sm text-slate-600">{notification.message}</div>
-                    <div className="mt-2 text-xs text-slate-500">{notification.created_at}</div>
+                    <div className="mt-2 text-xs text-slate-500">{formatTijuanaDateTime(notification.created_at)}</div>
                   </div>
                   <button
                     className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-line bg-white text-slate-600 hover:bg-slate-50"

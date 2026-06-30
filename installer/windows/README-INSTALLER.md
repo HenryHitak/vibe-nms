@@ -86,6 +86,14 @@ NMS_TCP_FALLBACK_PORTS=445,3389,80,443
 
 If one fallback port responds, the device is marked `ONLINE` and Monitoring Logs show method `PING+TCP`.
 
+Screen timestamps use Mexico/Tijuana by default:
+
+```text
+NMS_TIME_ZONE=America/Tijuana
+```
+
+This affects Audit Logs, Monitoring Logs, Alerts, AP Clients, and Display Dashboard display times. Audit Logs date filters are also interpreted in this timezone.
+
 For MS SQL Server, change the database settings in `.env`:
 
 ```text

@@ -49,6 +49,7 @@ from .schemas import (
     UserUpdatePayload,
 )
 from .security import Actor, actor_from_request, require_admin
+from .timezone import local_datetime_filter_to_utc_storage
 from .validation import VALID_CRITICALITY, VALID_DEVICE_TYPES, normalize_upper, validate_ip, validate_mac
 
 
@@ -447,6 +448,7 @@ def backend_runtime(actor: Actor = Depends(get_actor)) -> dict[str, Any]:
         }
     return {
         "app_name": settings.app_name,
+        "time_zone": settings.time_zone,
         "process": {
             "pid": os.getpid(),
             "host": os.getenv("NMS_HOST", "0.0.0.0"),
@@ -1026,12 +1028,15 @@ def audit_logs(
 ) -> list[dict[str, Any]]:
     clauses = []
     params: list[Any] = []
-    if date_from:
-        clauses.append("created_at >= ?")
-        params.append(date_from.replace("T", " "))
-    if date_to:
-        clauses.append("created_at <= ?")
-        params.append(date_to.replace("T", " "))
+    try:
+        if date_from:
+            clauses.append("created_at >= ?")
+            params.append(local_datetime_filter_to_utc_storage(date_from))
+        if date_to:
+            clauses.append("created_at <= ?")
+            params.append(local_datetime_filter_to_utc_storage(date_to))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Invalid audit log date filter") from exc
     if username:
         clauses.append("actor_username LIKE ?")
         params.append(f"%{username}%")

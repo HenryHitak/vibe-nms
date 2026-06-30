@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { KeyRound, Plus, Save, Trash2, UserRound, UserX } from "lucide-react";
 import { api } from "../api.js";
 import AdminLayout from "../components/AdminLayout.jsx";
+import { formatTijuanaDateTime } from "../time.js";
 
 const EMPTY_USER = {
   username: "",
@@ -182,7 +183,7 @@ export default function UserAdminPage() {
                   </td>
                   <td className="px-3 py-2 font-semibold">{user.role}</td>
                   <td className="px-3 py-2">{user.is_active ? "ACTIVE" : "DISABLED"}</td>
-                  <td className="px-3 py-2 tabular-nums">{user.last_login_at || "-"}</td>
+                  <td className="px-3 py-2 tabular-nums">{formatTijuanaDateTime(user.last_login_at)}</td>
                   <td className="px-3 py-2 tabular-nums">{user.last_login_ip || "-"}</td>
                   <td className="px-3 py-2 text-right" onClick={(event) => event.stopPropagation()}>
                     <button className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white text-amber-700 disabled:cursor-not-allowed disabled:opacity-40" title="Deactivate" disabled={!user.is_active} onClick={() => deactivate(user)}>
@@ -237,7 +238,7 @@ export default function UserAdminPage() {
               <div className="grid grid-cols-2 gap-2 rounded-md border border-line bg-slate-50 p-3 text-xs text-slate-600">
                 <div>
                   <div className="font-semibold text-slate-700">Last Login</div>
-                  <div className="mt-1 tabular-nums">{selected.last_login_at || "-"}</div>
+                  <div className="mt-1 tabular-nums">{formatTijuanaDateTime(selected.last_login_at)}</div>
                 </div>
                 <div>
                   <div className="font-semibold text-slate-700">Last IP</div>

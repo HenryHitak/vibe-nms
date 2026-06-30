@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Edit3, MapPin, Plus, RefreshCw, Save, Trash2, Wifi, X } from "lucide-react";
 import { api } from "../api.js";
 import StatusBadge from "../components/StatusBadge.jsx";
+import { formatTijuanaDateTime } from "../time.js";
 
 const CLIENT_STATUS_CLASS = {
   HEALTHY: "border-green-300 bg-green-100 text-green-800",
@@ -493,7 +494,7 @@ export default function APClientDiscoveryPage({ role }) {
                           <td className="px-3 py-2">{valueOrDash(client.ssid)}</td>
                           <td className="px-3 py-2">{valueOrDash(client.vlan)}</td>
                           <td className="px-3 py-2">{valueOrDash(client.rssi)}</td>
-                          <td className="px-3 py-2">{valueOrDash(client.last_seen)}</td>
+                          <td className="px-3 py-2">{formatTijuanaDateTime(client.last_seen)}</td>
                           {role === "ADMIN" ? (
                             <td className="px-3 py-2 text-right">
                               {!client.is_known_device ? (
@@ -544,7 +545,7 @@ export default function APClientDiscoveryPage({ role }) {
                           <div className="truncate font-semibold text-ink">{valueOrDash(row.client_hostname || row.client_mac_address)}</div>
                           <div className="truncate text-slate-500">{valueOrDash(row.client_ip_address)} / {valueOrDash(row.ssid)}</div>
                         </div>
-                        <div className="text-right tabular-nums text-slate-500">{valueOrDash(row.last_seen)}</div>
+                        <div className="text-right tabular-nums text-slate-500">{formatTijuanaDateTime(row.last_seen)}</div>
                       </div>
                     ))}
                     {!history.length ? <div className="text-sm text-slate-500">No history yet</div> : null}

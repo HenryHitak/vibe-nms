@@ -330,6 +330,7 @@ NMS_MSSQL_TRUST_SERVER_CERTIFICATE=true
 NMS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5177,http://localhost
 NMS_TRUSTED_PROXY_IPS=10.0.0.10,10.0.0.11
 NMS_CORPORATE_NETWORKS=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+NMS_TIME_ZONE=America/Tijuana
 NMS_COLLECTOR_ENABLED=true
 NMS_COLLECTOR_INTERVAL_SECONDS=30
 NMS_COLLECTOR_TIMEOUT_MS=1000
@@ -346,6 +347,8 @@ NMS_BOOTSTRAP_ADMIN_USERNAME=admin
 NMS_BOOTSTRAP_ADMIN_PASSWORD=admin
 NMS_BOOTSTRAP_ADMIN_EMAIL=admin@example.internal
 ```
+
+UI timestamps are displayed in `NMS_TIME_ZONE`. The Windows installer defaults this to `America/Tijuana` so Audit Logs, Monitoring Logs, Alerts, AP Clients, and Display Dashboard times use the Mexico/Tijuana time base instead of the Windows client timezone.
 
 ## Login and Roles
 

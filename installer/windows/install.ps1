@@ -238,6 +238,7 @@ NMS_DATABASE_PATH=$InstallDir\data\nms.sqlite
 NMS_FRONTEND_DIST=$InstallDir\frontend\dist
 NMS_ALLOWED_ORIGINS=$allowedOrigins
 NMS_CORPORATE_NETWORKS=$corporateNetworks
+NMS_TIME_ZONE=America/Tijuana
 NMS_COLLECTOR_ENABLED=true
 NMS_PING_COUNT=3
 NMS_TCP_FALLBACK_PORTS=445,3389,80,443
@@ -257,6 +258,7 @@ NMS_DISPLAY_API_TOKEN=
         "NMS_FRONTEND_DIST" = "$InstallDir\frontend\dist"
         "NMS_ALLOWED_ORIGINS" = ($accessUrls -join ",")
         "NMS_CORPORATE_NETWORKS" = (Merge-CsvValues -Existing $existingCorporateNetworks -Additional $corporateNetworks)
+        "NMS_TIME_ZONE" = "America/Tijuana"
         "NMS_PING_COUNT" = "3"
         "NMS_TCP_FALLBACK_PORTS" = "445,3389,80,443"
     }
