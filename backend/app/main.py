@@ -226,7 +226,8 @@ def login(payload: LoginRequest, request: Request) -> dict[str, Any]:
                 request_id=request_actor.request_id,
             )
             write_audit_log(conn, actor, "LOGIN", "USER", entity_id=user["id"])
-            public = _public_user(user) or {}
+            refreshed_user = row_to_dict(conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()) or user
+            public = _public_user(refreshed_user) or {}
             token = create_token({"sub": user["id"], "username": user["username"], "role": public["role"]})
             response_payload = {"token": token, "user": public}
     if login_failed or response_payload is None:

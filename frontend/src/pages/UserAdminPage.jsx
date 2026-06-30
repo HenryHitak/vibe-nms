@@ -113,6 +113,7 @@ export default function UserAdminPage() {
                 <th className="px-3 py-2">Role</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Last Login</th>
+                <th className="px-3 py-2">Last IP</th>
                 <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
@@ -126,6 +127,7 @@ export default function UserAdminPage() {
                   <td className="px-3 py-2 font-semibold">{user.role}</td>
                   <td className="px-3 py-2">{user.is_active ? "ACTIVE" : "DISABLED"}</td>
                   <td className="px-3 py-2 tabular-nums">{user.last_login_at || "-"}</td>
+                  <td className="px-3 py-2 tabular-nums">{user.last_login_ip || "-"}</td>
                   <td className="px-3 py-2 text-right" onClick={(event) => event.stopPropagation()}>
                     <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white text-red-700" title="Disable" onClick={() => disable(user)}>
                       <Trash2 size={14} />
@@ -172,6 +174,18 @@ export default function UserAdminPage() {
               <input type="checkbox" name="is_active" checked={Boolean(form.is_active)} onChange={change} />
               Active
             </label>
+            {selected?.id ? (
+              <div className="grid grid-cols-2 gap-2 rounded-md border border-line bg-slate-50 p-3 text-xs text-slate-600">
+                <div>
+                  <div className="font-semibold text-slate-700">Last Login</div>
+                  <div className="mt-1 tabular-nums">{selected.last_login_at || "-"}</div>
+                </div>
+                <div>
+                  <div className="font-semibold text-slate-700">Last IP</div>
+                  <div className="mt-1 tabular-nums">{selected.last_login_ip || "-"}</div>
+                </div>
+              </div>
+            ) : null}
             <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-ink px-3 text-sm font-semibold text-white" onClick={save}>
               <Save size={16} /> Save
             </button>
@@ -193,4 +207,3 @@ export default function UserAdminPage() {
     </AdminLayout>
   );
 }
-

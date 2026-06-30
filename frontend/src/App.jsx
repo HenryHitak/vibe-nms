@@ -184,7 +184,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <div className="hidden text-right text-sm md:block">
               <div className="font-semibold text-ink">{user.display_name || user.username}</div>
-              <div className="text-xs font-semibold text-slate-500">{role}</div>
+              <div className="text-xs font-semibold text-slate-500">{role} / {user.last_login_ip || "IP -"}</div>
             </div>
             <AlertBell count={summary?.active_alerts || 0} />
             <button className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-line bg-white" title="Logout" onClick={logout}>

@@ -28,6 +28,8 @@ Role: ADMIN
 
 After first login, go to `User Accounts` and create normal `USER` accounts for operators. `USER` accounts are read-only. `ADMIN` accounts can manage devices, imports, exports, alerts, settings, and users.
 
+`User Accounts` shows each user's last login time and last login IP. `Audit Logs` shows the source IP for every login, CRUD change, import, export, alert action, and settings change.
+
 This package contains:
 
 - FastAPI backend with MS SQL Server storage for deployment and SQLite fallback for local development
@@ -110,6 +112,8 @@ NMS_TRUSTED_PROXY_IPS=10.0.0.10,10.0.0.11
 ```
 
 The backend only trusts `X-Forwarded-For` and `X-Real-IP` when the direct client IP is in `NMS_TRUSTED_PROXY_IPS`. Otherwise it uses `request.client.host`.
+
+If the app is behind nginx, a VPN, or an intranet reverse proxy, the backend may see the proxy IP instead of the user's PC IP. Add only trusted proxy IPs to `NMS_TRUSTED_PROXY_IPS` so `X-Forwarded-For` can be used safely.
 
 ## Environment Variables
 
