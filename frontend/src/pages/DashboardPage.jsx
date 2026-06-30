@@ -85,10 +85,13 @@ export default function DashboardPage() {
       setSelected(null);
       return;
     }
-    if (!selected || !filteredDevices.some((device) => device.id === selected.id)) {
+    const latestSelected = selected?.id ? filteredDevices.find((device) => device.id === selected.id) : null;
+    if (latestSelected) {
+      setSelected(latestSelected);
+    } else {
       setSelected(filteredDevices[0]);
     }
-  }, [filteredDevices, selected]);
+  }, [filteredDevices, selected?.id]);
 
   const counts = useMemo(
     () => filteredDevices.reduce((acc, device) => {
@@ -240,7 +243,7 @@ export default function DashboardPage() {
           </section>
         </div>
 
-        <div className="grid min-h-[520px] grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
+        <div className="grid min-h-[560px] grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
           <section className="min-h-0">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-semibold">Devices</h2>
