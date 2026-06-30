@@ -86,7 +86,7 @@ class LoginRequest(BaseModel):
 
 class UserCreatePayload(BaseModel):
     username: str
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=4)
     display_name: str | None = None
     email: str | None = None
     role: str = "USER"
@@ -101,4 +101,4 @@ class UserUpdatePayload(BaseModel):
 
 
 class PasswordResetPayload(BaseModel):
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=4)

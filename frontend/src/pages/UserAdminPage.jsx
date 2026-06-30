@@ -12,6 +12,16 @@ const EMPTY_USER = {
   is_active: true
 };
 
+function passwordError(value) {
+  if (!value) {
+    return "Password is required.";
+  }
+  if (value.length < 4) {
+    return "Password must be at least 4 characters.";
+  }
+  return "";
+}
+
 export default function UserAdminPage() {
   const [users, setUsers] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -51,6 +61,18 @@ export default function UserAdminPage() {
 
   async function save() {
     try {
+      const username = (form.username || "").trim();
+      if (!selected?.id && !username) {
+        setError("Username is required.");
+        return;
+      }
+      if (!selected?.id) {
+        const validationError = passwordError(form.password || "");
+        if (validationError) {
+          setError(validationError);
+          return;
+        }
+      }
       if (selected?.id) {
         await api(`/users/${selected.id}`, {
           method: "PUT",
@@ -62,7 +84,15 @@ export default function UserAdminPage() {
           })
         });
       } else {
-        await api("/users", { method: "POST", body: JSON.stringify(form) });
+        await api("/users", {
+          method: "POST",
+          body: JSON.stringify({
+            ...form,
+            username,
+            display_name: (form.display_name || "").trim() || username,
+            email: (form.email || "").trim() || null
+          })
+        });
       }
       await load();
       startCreate();
@@ -73,6 +103,11 @@ export default function UserAdminPage() {
 
   async function reset() {
     if (!selected?.id || !resetPassword) return;
+    const validationError = passwordError(resetPassword);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     try {
       await api(`/users/${selected.id}/reset-password`, {
         method: "POST",
@@ -152,7 +187,7 @@ export default function UserAdminPage() {
             {!selected?.id ? (
               <label className="block">
                 <span className="mb-1 block text-slate-600">Initial Password</span>
-                <input className="h-10 w-full rounded-md border border-line px-3" name="password" type="password" value={form.password || ""} onChange={change} />
+                <input className="h-10 w-full rounded-md border border-line px-3" name="password" type="password" value={form.password || ""} onChange={change} minLength={4} />
               </label>
             ) : null}
             <label className="block">
@@ -197,7 +232,7 @@ export default function UserAdminPage() {
                 <KeyRound size={17} className="text-slate-500" /> Reset Password
               </div>
               <div className="flex gap-2">
-                <input className="h-10 min-w-0 flex-1 rounded-md border border-line px-3 text-sm" type="password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} />
+                <input className="h-10 min-w-0 flex-1 rounded-md border border-line px-3 text-sm" type="password" minLength={4} value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} />
                 <button className="h-10 rounded-md border border-line bg-white px-3 text-sm font-semibold" onClick={reset}>Reset</button>
               </div>
             </div>

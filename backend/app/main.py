@@ -539,6 +539,9 @@ def list_users(actor: Actor = Depends(get_actor)) -> list[dict[str, Any]]:
 def create_user(payload: UserCreatePayload, actor: Actor = Depends(get_actor)) -> dict[str, Any]:
     require_admin(actor)
     role = normalize_role(payload.role)
+    username = payload.username.strip()
+    if not username:
+        raise HTTPException(status_code=422, detail="Username is required")
     try:
         with transaction() as conn:
             cursor = conn.execute(
@@ -547,8 +550,8 @@ def create_user(payload: UserCreatePayload, actor: Actor = Depends(get_actor)) -
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    payload.username.strip(),
-                    payload.display_name or payload.username.strip(),
+                    username,
+                    payload.display_name or username,
                     payload.email,
                     role,
                     hash_password(payload.password),

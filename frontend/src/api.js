@@ -29,6 +29,34 @@ export function getActorHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function humanizeField(value) {
+  return String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatErrorDetail(detail) {
+  if (!detail) {
+    return "";
+  }
+  if (typeof detail === "string") {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+        const location = Array.isArray(item?.loc) ? item.loc.filter((part) => part !== "body").pop() : "";
+        const field = location ? `${humanizeField(location)}: ` : "";
+        return `${field}${item?.msg || JSON.stringify(item)}`;
+      })
+      .join(" ");
+  }
+  return detail.message || detail.msg || JSON.stringify(detail);
+}
+
 export async function api(path, options = {}) {
   const headers = {
     ...getActorHeaders(),
@@ -45,7 +73,8 @@ export async function api(path, options = {}) {
     if (response.status === 401) {
       clearSession();
     }
-    throw new Error(payload?.detail || payload || `Request failed: ${response.status}`);
+    const message = formatErrorDetail(payload?.detail || payload) || `Request failed: ${response.status}`;
+    throw new Error(message);
   }
   return payload;
 }
