@@ -96,11 +96,13 @@ This creates:
 vibe-nms-windows-installer.zip
 ```
 
-On the target PC, extract the zip and run PowerShell as Administrator:
+On the target PC, extract the zip and run:
 
-```powershell
-.\installer\install.ps1
+```text
+Install Vibe NMS.cmd
 ```
+
+Do not double-click `.ps1` files. On some company PCs they open in Notepad; the `.cmd` wrapper handles PowerShell and administrator permission automatically.
 
 Open:
 

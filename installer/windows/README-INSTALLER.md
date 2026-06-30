@@ -4,11 +4,13 @@ This package runs Vibe NMS without Docker.
 
 ## Install
 
-Open PowerShell as Administrator in the extracted installer folder:
+Extract the zip, then run:
 
-```powershell
-.\installer\install.ps1
+```text
+Install Vibe NMS.cmd
 ```
+
+If Windows asks for administrator permission, approve it. Do not double-click `.ps1` files; on some company PCs those files open in Notepad.
 
 Open:
 
@@ -62,13 +64,13 @@ Start-ScheduledTask -TaskName VibeNMS
 
 ## Uninstall
 
-Open PowerShell as Administrator:
+Run:
 
-```powershell
-.\installer\uninstall.ps1
+```text
+Uninstall Vibe NMS.cmd
 ```
 
-Keep data during uninstall:
+Advanced option, keep data during uninstall:
 
 ```powershell
 .\installer\uninstall.ps1 -KeepData
