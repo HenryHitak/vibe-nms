@@ -29,6 +29,9 @@ DEVICE_COLUMNS = [
     "hostname",
     "connected_ap_name",
     "connected_ap_ip",
+    "ap_vendor",
+    "ap_controller_type",
+    "ap_controller_id",
     "switch_name",
     "switch_port",
     "vlan",
@@ -211,7 +214,7 @@ def row_to_dict(row: Any | None) -> dict[str, Any] | None:
     if row is None:
         return None
     data = row.to_dict() if hasattr(row, "to_dict") else dict(row)
-    for key in ("before_data_json", "after_data_json", "changed_fields_json", "row_data_json", "permissions_json"):
+    for key in ("before_data_json", "after_data_json", "changed_fields_json", "row_data_json", "permissions_json", "raw_data_json"):
         if key in data and isinstance(data[key], str) and data[key]:
             try:
                 data[key] = json.loads(data[key])
@@ -276,6 +279,9 @@ def init_db() -> None:
                 hostname TEXT,
                 connected_ap_name TEXT,
                 connected_ap_ip TEXT,
+                ap_vendor TEXT,
+                ap_controller_type TEXT,
+                ap_controller_id TEXT,
                 switch_name TEXT,
                 switch_port TEXT,
                 vlan INTEGER,
@@ -420,9 +426,69 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_audit_filters ON audit_logs(actor_username, action_type, entity_type, target_ip_address);
             CREATE INDEX IF NOT EXISTS idx_metrics_device_checked ON device_metrics(device_id, checked_at);
             CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status, severity);
+            CREATE TABLE IF NOT EXISTS ap_client_discovery_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                completed_at TEXT,
+                status TEXT NOT NULL DEFAULT 'RUNNING',
+                provider TEXT,
+                total_aps INTEGER NOT NULL DEFAULT 0,
+                total_clients INTEGER NOT NULL DEFAULT 0,
+                known_count INTEGER NOT NULL DEFAULT 0,
+                unknown_count INTEGER NOT NULL DEFAULT 0,
+                issue_count INTEGER NOT NULL DEFAULT 0,
+                duration_ms INTEGER NOT NULL DEFAULT 0,
+                triggered_by TEXT,
+                triggered_from_ip TEXT,
+                error_message TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS ap_client_observations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ap_id INTEGER NOT NULL REFERENCES network_devices(id) ON DELETE CASCADE,
+                ap_name TEXT,
+                ap_ip_address TEXT,
+                client_mac_address TEXT,
+                client_ip_address TEXT,
+                client_hostname TEXT,
+                username TEXT,
+                ssid TEXT,
+                vlan INTEGER,
+                rssi INTEGER,
+                signal_quality TEXT,
+                connection_status TEXT,
+                first_seen TEXT,
+                last_seen TEXT,
+                source TEXT,
+                confidence REAL,
+                raw_data_json TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS ap_connected_clients_current (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ap_id INTEGER NOT NULL REFERENCES network_devices(id) ON DELETE CASCADE,
+                client_mac_address TEXT,
+                client_ip_address TEXT,
+                client_hostname TEXT,
+                ssid TEXT,
+                vlan INTEGER,
+                rssi INTEGER,
+                status TEXT NOT NULL DEFAULT 'UNKNOWN',
+                last_seen TEXT,
+                is_known_device INTEGER NOT NULL DEFAULT 0,
+                matched_device_id INTEGER REFERENCES network_devices(id) ON DELETE SET NULL,
+                mismatch_reason TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_ap_obs_ap_seen ON ap_client_observations(ap_id, last_seen);
+            CREATE INDEX IF NOT EXISTS idx_ap_obs_client_ip ON ap_client_observations(client_ip_address);
+            CREATE INDEX IF NOT EXISTS idx_ap_current_ap ON ap_connected_clients_current(ap_id);
+            CREATE INDEX IF NOT EXISTS idx_ap_current_ip ON ap_connected_clients_current(client_ip_address);
             """
             )
             migrate_sqlite_users(conn)
+            migrate_sqlite_network_devices(conn)
         seed_reference_data(conn)
         if settings.seed_sample_data:
             seed_sample_devices(conn)
@@ -445,6 +511,18 @@ def migrate_sqlite_users(conn: sqlite3.Connection) -> None:
     conn.execute("UPDATE users SET role = 'USER' WHERE role = 'VIEWER'")
     conn.execute("DELETE FROM roles WHERE role_name IN ('viewer', 'VIEWER')")
     conn.execute("UPDATE roles SET role_name = UPPER(role_name)")
+
+
+def migrate_sqlite_network_devices(conn: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(network_devices)").fetchall()}
+    additions = {
+        "ap_vendor": "TEXT",
+        "ap_controller_type": "TEXT",
+        "ap_controller_id": "TEXT",
+    }
+    for column, definition in additions.items():
+        if column not in columns:
+            conn.execute(f"ALTER TABLE network_devices ADD COLUMN {column} {definition}")
 
 
 def seed_reference_data(conn: sqlite3.Connection) -> None:

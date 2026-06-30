@@ -109,6 +109,9 @@ function DeviceHoverPreview({ device, position }) {
 
           <PreviewSection title="Asset">
             <PreviewField label="Type" value={device.device_type} />
+            <PreviewField label="Vendor" value={device.ap_vendor} />
+            <PreviewField label="Ctrl" value={device.ap_controller_type} />
+            <PreviewField label="Ctrl ID" value={device.ap_controller_id} />
             <PreviewField label="Owner" value={device.owner_department} />
             <PreviewField label="Up By" value={device.updated_by} />
             <PreviewField label="Update" value={device.updated_at} />

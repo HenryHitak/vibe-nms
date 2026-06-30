@@ -27,6 +27,7 @@ function Stat({ icon: Icon, label, value, tone }) {
 export default function DashboardPage() {
   const [summary, setSummary] = useState(null);
   const [devices, setDevices] = useState([]);
+  const [apDashboard, setApDashboard] = useState([]);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailDevice, setDetailDevice] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -37,12 +38,14 @@ export default function DashboardPage() {
 
   async function load() {
     try {
-      const [summaryPayload, devicesPayload] = await Promise.all([
+      const [summaryPayload, devicesPayload, apPayload] = await Promise.all([
         api("/dashboard/summary"),
-        api("/devices")
+        api("/devices"),
+        api("/dashboard/by-ap")
       ]);
       setSummary(summaryPayload);
       setDevices(devicesPayload);
+      setApDashboard(apPayload);
       setError("");
     } catch (err) {
       setError(err.message);
@@ -213,6 +216,39 @@ export default function DashboardPage() {
                 </div>
               </button>
             ))}
+          </div>
+        </section>
+
+        <section className="mb-5 rounded-md border border-line bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold">AP Connected IPs</h2>
+            <span className="text-sm text-slate-500">{apDashboard.length} APs</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {apDashboard.map((item) => {
+              const ap = item.ap;
+              return (
+                <div key={ap.id} className="rounded-md border border-line bg-slate-50 p-3">
+                  <div className="mb-2 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold text-ink">{ap.device_name}</div>
+                      <div className="truncate text-xs text-slate-500">{ap.ip_address}</div>
+                    </div>
+                    <div className="text-right text-xs text-slate-500">
+                      <div className="font-semibold text-ink">{item.connected_client_count}</div>
+                      clients
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {item.connected_ip_addresses.map((ip) => (
+                      <span key={ip} className="rounded border border-line bg-white px-1.5 py-0.5 text-xs font-semibold tabular-nums text-slate-700">{ip}</span>
+                    ))}
+                    {!item.connected_ip_addresses.length ? <span className="text-xs text-slate-500">No connected IPs discovered</span> : null}
+                  </div>
+                </div>
+              );
+            })}
+            {!apDashboard.length ? <div className="text-sm text-slate-500">No AP devices registered</div> : null}
           </div>
         </section>
 

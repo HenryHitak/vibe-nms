@@ -57,6 +57,9 @@ BEGIN
         hostname NVARCHAR(255) NULL,
         connected_ap_name NVARCHAR(200) NULL,
         connected_ap_ip NVARCHAR(64) NULL,
+        ap_vendor NVARCHAR(80) NULL,
+        ap_controller_type NVARCHAR(80) NULL,
+        ap_controller_id NVARCHAR(200) NULL,
         switch_name NVARCHAR(200) NULL,
         switch_port NVARCHAR(80) NULL,
         vlan INT NULL,
@@ -80,6 +83,14 @@ BEGIN
         is_deleted BIT NOT NULL DEFAULT 0
     );
 END
+GO
+
+IF COL_LENGTH(N'dbo.network_devices', N'ap_vendor') IS NULL
+    ALTER TABLE dbo.network_devices ADD ap_vendor NVARCHAR(80) NULL;
+IF COL_LENGTH(N'dbo.network_devices', N'ap_controller_type') IS NULL
+    ALTER TABLE dbo.network_devices ADD ap_controller_type NVARCHAR(80) NULL;
+IF COL_LENGTH(N'dbo.network_devices', N'ap_controller_id') IS NULL
+    ALTER TABLE dbo.network_devices ADD ap_controller_id NVARCHAR(200) NULL;
 GO
 
 IF OBJECT_ID(N'dbo.audit_logs', N'U') IS NULL
@@ -237,6 +248,76 @@ BEGIN
 END
 GO
 
+IF OBJECT_ID(N'dbo.ap_client_discovery_runs', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ap_client_discovery_runs (
+        id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        started_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+        completed_at DATETIME2 NULL,
+        status NVARCHAR(30) NOT NULL DEFAULT N'RUNNING',
+        provider NVARCHAR(80) NULL,
+        total_aps INT NOT NULL DEFAULT 0,
+        total_clients INT NOT NULL DEFAULT 0,
+        known_count INT NOT NULL DEFAULT 0,
+        unknown_count INT NOT NULL DEFAULT 0,
+        issue_count INT NOT NULL DEFAULT 0,
+        duration_ms INT NOT NULL DEFAULT 0,
+        triggered_by NVARCHAR(120) NULL,
+        triggered_from_ip NVARCHAR(64) NULL,
+        error_message NVARCHAR(MAX) NULL
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.ap_client_observations', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ap_client_observations (
+        id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        ap_id INT NOT NULL,
+        ap_name NVARCHAR(200) NULL,
+        ap_ip_address NVARCHAR(64) NULL,
+        client_mac_address NVARCHAR(64) NULL,
+        client_ip_address NVARCHAR(64) NULL,
+        client_hostname NVARCHAR(255) NULL,
+        username NVARCHAR(255) NULL,
+        ssid NVARCHAR(255) NULL,
+        vlan INT NULL,
+        rssi INT NULL,
+        signal_quality NVARCHAR(80) NULL,
+        connection_status NVARCHAR(80) NULL,
+        first_seen DATETIME2 NULL,
+        last_seen DATETIME2 NULL,
+        source NVARCHAR(80) NULL,
+        confidence FLOAT NULL,
+        raw_data_json NVARCHAR(MAX) NULL,
+        created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT fk_ap_client_observations_ap FOREIGN KEY(ap_id) REFERENCES dbo.network_devices(id) ON DELETE CASCADE
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.ap_connected_clients_current', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ap_connected_clients_current (
+        id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        ap_id INT NOT NULL,
+        client_mac_address NVARCHAR(64) NULL,
+        client_ip_address NVARCHAR(64) NULL,
+        client_hostname NVARCHAR(255) NULL,
+        ssid NVARCHAR(255) NULL,
+        vlan INT NULL,
+        rssi INT NULL,
+        status NVARCHAR(80) NOT NULL DEFAULT N'UNKNOWN',
+        last_seen DATETIME2 NULL,
+        is_known_device BIT NOT NULL DEFAULT 0,
+        matched_device_id INT NULL,
+        mismatch_reason NVARCHAR(500) NULL,
+        CONSTRAINT fk_ap_connected_clients_current_ap FOREIGN KEY(ap_id) REFERENCES dbo.network_devices(id) ON DELETE CASCADE,
+        CONSTRAINT fk_ap_connected_clients_current_device FOREIGN KEY(matched_device_id) REFERENCES dbo.network_devices(id) ON DELETE SET NULL
+    );
+END
+GO
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_devices_status')
     CREATE INDEX idx_devices_status ON dbo.network_devices(status);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_devices_plant_line')
@@ -249,6 +330,14 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_metrics_device_check
     CREATE INDEX idx_metrics_device_checked ON dbo.device_metrics(device_id, checked_at);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_alerts_status')
     CREATE INDEX idx_alerts_status ON dbo.alerts(status, severity);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_ap_obs_ap_seen')
+    CREATE INDEX idx_ap_obs_ap_seen ON dbo.ap_client_observations(ap_id, last_seen);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_ap_obs_client_ip')
+    CREATE INDEX idx_ap_obs_client_ip ON dbo.ap_client_observations(client_ip_address);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_ap_current_ap')
+    CREATE INDEX idx_ap_current_ap ON dbo.ap_connected_clients_current(ap_id);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_ap_current_ip')
+    CREATE INDEX idx_ap_current_ip ON dbo.ap_connected_clients_current(client_ip_address);
 GO
 
 MERGE dbo.roles AS target

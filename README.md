@@ -43,10 +43,48 @@ Do not rely on the browser for ping checks. The browser only displays data. The 
 
 If a single registered IP drops, the collector creates an ACTIVE warning alert after the first failed check, and the dashboard banner shows it on the next refresh. If multiple alerts happen in the same Plant, the banner rolls the message up to Plant-level impact.
 
+## AP Client Discovery
+
+The backend also runs a separate AP Client Discovery collector. It is independent from the ping monitoring worker.
+
+Registered access points are `Device Master` rows where `Device Type` is `AP` and `Monitoring Enabled` is on. The collector reads AP/controller data from the backend network only; the browser never scans the network.
+
+MVP provider:
+
+```text
+NMS_AP_CLIENT_DEFAULT_PROVIDER=demo
+```
+
+The demo provider uses registered device AP mappings for local testing. For production, set the AP row's `AP Controller Type` to one of:
+
+```text
+meraki-api
+aruba-central-api
+unifi-api
+cisco-wlc
+generic-snmp
+generic-api
+```
+
+Controller credentials stay in backend environment variables only:
+
+```text
+NMS_MERAKI_API_TOKEN=
+NMS_ARUBA_CENTRAL_API_TOKEN=
+NMS_UNIFI_API_TOKEN=
+NMS_CISCO_WLC_API_TOKEN=
+NMS_GENERIC_API_TOKEN=
+```
+
+Use read-only controller/API tokens whenever possible. These tokens are never returned to the frontend.
+
+Open `AP Clients` to see each AP's status, connected client count, known/unknown counts, connected IP list, MAC, hostname, SSID, VLAN, RSSI, last seen time, and status. Admins can manually run discovery from that page; manual runs are written to `Audit Logs` with username and source IP.
+
 This package contains:
 
 - FastAPI backend with MS SQL Server storage for deployment and SQLite fallback for local development
 - Background ping collector
+- Separate AP client discovery collector with provider adapters
 - Device CRUD with soft delete and restore
 - CRUD audit logs with username, role, source IP, user agent, before/after data, request id, and result
 - Excel template, import preview, import commit, Excel export, full backup zip, migration JSON

@@ -16,9 +16,11 @@ import {
   Settings,
   Shield,
   UserRound,
+  Wifi,
   X
 } from "lucide-react";
 import { api, clearSession, getStoredUser, getToken, setSession } from "./api.js";
+import APClientDiscoveryPage from "./pages/APClientDiscoveryPage.jsx";
 import AlertBell from "./components/AlertBell.jsx";
 import AlertCenter from "./pages/AlertCenter.jsx";
 import AuditLogPage from "./pages/AuditLogPage.jsx";
@@ -58,7 +60,8 @@ export default function App() {
   const routes = useMemo(() => {
     const base = [
       { key: "dashboard", label: "Dashboard", icon: Gauge, page: DashboardPage },
-      { key: "alerts", label: "Alert Center", icon: BellRing, page: AlertCenter }
+      { key: "alerts", label: "Alert Center", icon: BellRing, page: AlertCenter },
+      { key: "ap-clients", label: "AP Clients", icon: Wifi, page: APClientDiscoveryPage }
     ];
     return role === "ADMIN" ? [...base, ...ADMIN_ROUTES] : base;
   }, [role]);
@@ -168,7 +171,7 @@ export default function App() {
           {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
         </button>
         <nav className="space-y-1">
-          {routes.slice(0, 2).map(navButton)}
+          {routes.slice(0, 3).map(navButton)}
         </nav>
         {role === "ADMIN" ? (
           <>

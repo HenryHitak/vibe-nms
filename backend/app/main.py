@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Uploa
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from .ap_client_discovery_worker import AP_CLIENT_ALERT_TYPES, ap_client_discovery_loop, run_ap_client_discovery_cycle
 from .audit import changed_fields, write_audit_log
 from .auth import bearer_token_from_request, create_token, decode_token, hash_password, normalize_role, verify_password
 from .config import settings
@@ -46,20 +47,29 @@ from .validation import VALID_CRITICALITY, VALID_DEVICE_TYPES, normalize_upper, 
 
 collector_stop_event: asyncio.Event | None = None
 collector_task: asyncio.Task | None = None
+ap_discovery_stop_event: asyncio.Event | None = None
+ap_discovery_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    global collector_stop_event, collector_task
+    global collector_stop_event, collector_task, ap_discovery_stop_event, ap_discovery_task
     init_db()
     if settings.collector_enabled:
         collector_stop_event = asyncio.Event()
         collector_task = asyncio.create_task(collector_loop(collector_stop_event))
+    if settings.ap_client_discovery_enabled:
+        ap_discovery_stop_event = asyncio.Event()
+        ap_discovery_task = asyncio.create_task(ap_client_discovery_loop(ap_discovery_stop_event))
     yield
     if collector_stop_event:
         collector_stop_event.set()
+    if ap_discovery_stop_event:
+        ap_discovery_stop_event.set()
     if collector_task:
         await collector_task
+    if ap_discovery_task:
+        await ap_discovery_task
 
 
 app = FastAPI(title=settings.app_name, version="1.0.0", lifespan=lifespan)
@@ -735,6 +745,152 @@ def monitoring_logs(
 async def run_monitoring_once(actor: Actor = Depends(get_actor)) -> dict[str, int]:
     require_admin(actor)
     return await run_monitoring_cycle()
+
+
+def _get_access_point(conn: sqlite3.Connection, ap_id: int) -> dict[str, Any]:
+    ap = row_to_dict(conn.execute("SELECT * FROM network_devices WHERE id = ?", (ap_id,)).fetchone())
+    if not ap or str(ap.get("device_type") or "").upper() != "AP":
+        raise HTTPException(status_code=404, detail="Access point not found")
+    return ap
+
+
+def _ap_summary(conn: sqlite3.Connection, ap: dict[str, Any]) -> dict[str, Any]:
+    clients = rows_to_dicts(
+        conn.execute(
+            """
+            SELECT c.*, d.device_name AS matched_device_name, d.criticality AS matched_device_criticality
+            FROM ap_connected_clients_current c
+            LEFT JOIN network_devices d ON d.id = c.matched_device_id
+            WHERE c.ap_id = ?
+            ORDER BY c.status, c.client_ip_address, c.client_hostname
+            """,
+            (ap["id"],),
+        ).fetchall()
+    )
+    known_count = sum(1 for client in clients if client.get("is_known_device"))
+    unknown_count = len(clients) - known_count
+    return {
+        "ap": ap,
+        "connected_client_count": len(clients),
+        "known_device_count": known_count,
+        "unknown_device_count": unknown_count,
+        "connected_ip_addresses": [client["client_ip_address"] for client in clients if client.get("client_ip_address")],
+        "clients": clients,
+    }
+
+
+@app.get("/api/access-points/{ap_id}/clients")
+def access_point_clients(ap_id: int) -> list[dict[str, Any]]:
+    with transaction() as conn:
+        _get_access_point(conn, ap_id)
+        rows = conn.execute(
+            """
+            SELECT c.*, d.device_name AS matched_device_name, d.criticality AS matched_device_criticality,
+                   d.connected_ap_name AS expected_ap_name, d.connected_ap_ip AS expected_ap_ip
+            FROM ap_connected_clients_current c
+            LEFT JOIN network_devices d ON d.id = c.matched_device_id
+            WHERE c.ap_id = ?
+            ORDER BY CASE c.status
+                WHEN 'IP_CONFLICT' THEN 0
+                WHEN 'WRONG_AP' THEN 1
+                WHEN 'UNKNOWN_DEVICE' THEN 2
+                WHEN 'NO_IP' THEN 3
+                WHEN 'WEAK_SIGNAL' THEN 4
+                ELSE 5 END,
+                c.client_ip_address, c.client_hostname
+            """,
+            (ap_id,),
+        ).fetchall()
+        return rows_to_dicts(rows)
+
+
+@app.get("/api/access-points/{ap_id}/clients/history")
+def access_point_client_history(
+    ap_id: int,
+    limit: int = Query(200, ge=1, le=1000),
+) -> list[dict[str, Any]]:
+    with transaction() as conn:
+        _get_access_point(conn, ap_id)
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM ap_client_observations
+            WHERE ap_id = ?
+            ORDER BY last_seen DESC, id DESC
+            LIMIT ?
+            """,
+            (ap_id, limit),
+        ).fetchall()
+        return rows_to_dicts(rows)
+
+
+@app.get("/api/access-points/{ap_id}/summary")
+def access_point_summary(ap_id: int) -> dict[str, Any]:
+    with transaction() as conn:
+        ap = _get_access_point(conn, ap_id)
+        return _ap_summary(conn, ap)
+
+
+@app.get("/api/dashboard/by-ap")
+def dashboard_by_ap() -> list[dict[str, Any]]:
+    with transaction() as conn:
+        aps = rows_to_dicts(
+            conn.execute(
+                """
+                SELECT *
+                FROM network_devices
+                WHERE is_deleted = 0 AND UPPER(device_type) = 'AP'
+                ORDER BY COALESCE(plant_name, plant_code), COALESCE(line_name, line_code), device_name
+                """
+            ).fetchall()
+        )
+        return [_ap_summary(conn, ap) for ap in aps]
+
+
+@app.post("/api/discovery/ap-clients/run")
+async def run_ap_client_discovery_once(actor: Actor = Depends(get_actor)) -> dict[str, int]:
+    require_admin(actor)
+    try:
+        result = await run_ap_client_discovery_cycle(actor=actor)
+        with transaction() as conn:
+            write_audit_log(
+                conn,
+                actor,
+                "DISCOVERY_RUN",
+                "AP_CLIENTS",
+                after_data=result,
+            )
+        return result
+    except Exception as exc:
+        _audit_failure(actor, "DISCOVERY_RUN", "AP_CLIENTS", exc)
+        raise
+
+
+@app.get("/api/alerts/ap-client-issues")
+def ap_client_issue_alerts(status: str | None = None) -> list[dict[str, Any]]:
+    params: list[Any] = list(AP_CLIENT_ALERT_TYPES)
+    placeholders = ", ".join(["?"] * len(params))
+    clauses = [f"a.alert_type IN ({placeholders})"]
+    if status:
+        clauses.append("a.status = ?")
+        params.append(status.upper())
+    where = f"WHERE {' AND '.join(clauses)}"
+    with transaction() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT a.*, d.device_name, d.ip_address,
+                   COALESCE(d.plant_name, d.plant_code) AS plant_name,
+                   COALESCE(d.line_name, d.line_code) AS line_name,
+                   d.connected_ap_name
+            FROM alerts a
+            LEFT JOIN network_devices d ON d.id = a.device_id
+            {where}
+            ORDER BY CASE a.status WHEN 'ACTIVE' THEN 0 WHEN 'ACKNOWLEDGED' THEN 1 ELSE 2 END,
+                     a.last_detected_at DESC
+            """,
+            params,
+        ).fetchall()
+        return rows_to_dicts(rows)
 
 
 @app.get("/api/alerts")

@@ -22,6 +22,9 @@ class DevicePayload(BaseModel):
     hostname: str | None = None
     connected_ap_name: str | None = None
     connected_ap_ip: str | None = None
+    ap_vendor: str | None = None
+    ap_controller_type: str | None = None
+    ap_controller_id: str | None = None
     switch_name: str | None = None
     switch_port: str | None = None
     vlan: int | None = None
@@ -48,6 +51,9 @@ class DevicePatch(BaseModel):
     hostname: str | None = None
     connected_ap_name: str | None = None
     connected_ap_ip: str | None = None
+    ap_vendor: str | None = None
+    ap_controller_type: str | None = None
+    ap_controller_id: str | None = None
     switch_name: str | None = None
     switch_port: str | None = None
     vlan: int | None = None

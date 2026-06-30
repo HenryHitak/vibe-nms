@@ -19,6 +19,9 @@ const EMPTY_DEVICE = {
   hostname: "",
   connected_ap_name: "",
   connected_ap_ip: "",
+  ap_vendor: "",
+  ap_controller_type: "",
+  ap_controller_id: "",
   switch_name: "",
   switch_port: "",
   vlan: "",
@@ -185,6 +188,17 @@ export default function DeviceAdminPage() {
             <Field label="Hostname" name="hostname" value={form.hostname} onChange={updateForm} />
             <Field label="Connected AP Name" name="connected_ap_name" value={form.connected_ap_name} onChange={updateForm} />
             <Field label="Connected AP IP" name="connected_ap_ip" value={form.connected_ap_ip} onChange={updateForm} />
+            <Field label="AP Vendor" name="ap_vendor" value={form.ap_vendor} onChange={updateForm} />
+            <label className="block text-sm">
+              <span className="mb-1 block text-slate-600">AP Controller Type</span>
+              <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="ap_controller_type" value={form.ap_controller_type || ""} onChange={updateForm}>
+                <option value="">Default</option>
+                {["demo", "meraki-api", "aruba-central-api", "unifi-api", "cisco-wlc", "generic-snmp", "generic-api"].map((value) => (
+                  <option key={value} value={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+            <Field label="AP Controller ID" name="ap_controller_id" value={form.ap_controller_id} onChange={updateForm} />
             <Field label="Switch Name" name="switch_name" value={form.switch_name} onChange={updateForm} />
             <Field label="Switch Port" name="switch_port" value={form.switch_port} onChange={updateForm} />
             <Field label="VLAN" name="vlan" value={form.vlan ?? ""} onChange={updateForm} type="number" />
