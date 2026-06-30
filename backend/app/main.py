@@ -361,6 +361,23 @@ def list_devices(
         return rows_to_dicts(rows)
 
 
+@app.get("/api/devices/{device_id}")
+def get_device_detail(device_id: int, actor: Actor = Depends(get_actor)) -> dict[str, Any]:
+    with transaction() as conn:
+        row = conn.execute(
+            """
+            SELECT d.*,
+                   (SELECT COUNT(*) FROM alerts a WHERE a.device_id = d.id AND a.status = 'ACTIVE') AS active_alert_count
+            FROM network_devices d
+            WHERE d.id = ?
+            """,
+            (device_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Device not found")
+        return row_to_dict(row) or {}
+
+
 @app.post("/api/devices", status_code=201)
 def create_device(payload: DevicePayload, actor: Actor = Depends(get_actor)) -> dict[str, Any]:
     require_admin(actor)

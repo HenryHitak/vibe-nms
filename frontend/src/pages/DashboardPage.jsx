@@ -3,7 +3,7 @@ import { Activity, AlertTriangle, CheckCircle2, Filter, RadioTower, ServerCrash 
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../api.js";
 import AlertBanner from "../components/AlertBanner.jsx";
-import DeviceDetailPanel from "../components/DeviceDetailPanel.jsx";
+import DeviceDetailModal from "../components/DeviceDetailModal.jsx";
 import DeviceTable from "../components/DeviceTable.jsx";
 
 function Stat({ icon: Icon, label, value, tone }) {
@@ -27,7 +27,10 @@ function Stat({ icon: Icon, label, value, tone }) {
 export default function DashboardPage() {
   const [summary, setSummary] = useState(null);
   const [devices, setDevices] = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailDevice, setDetailDevice] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
   const [plantFilter, setPlantFilter] = useState("");
   const [lineFilter, setLineFilter] = useState("");
   const [error, setError] = useState("");
@@ -80,18 +83,25 @@ export default function DashboardPage() {
     }
   }, [lineFilter, lineOptions]);
 
-  useEffect(() => {
-    if (!filteredDevices.length) {
-      setSelected(null);
-      return;
+  async function openDeviceDetail(device) {
+    setDetailOpen(true);
+    setDetailDevice(device);
+    setDetailLoading(true);
+    setDetailError("");
+    try {
+      const latestDevice = await api(`/devices/${device.id}`);
+      setDetailDevice(latestDevice);
+    } catch (err) {
+      setDetailError(err.message);
+    } finally {
+      setDetailLoading(false);
     }
-    const latestSelected = selected?.id ? filteredDevices.find((device) => device.id === selected.id) : null;
-    if (latestSelected) {
-      setSelected(latestSelected);
-    } else {
-      setSelected(filteredDevices[0]);
-    }
-  }, [filteredDevices, selected?.id]);
+  }
+
+  function closeDeviceDetail() {
+    setDetailOpen(false);
+    setDetailError("");
+  }
 
   const counts = useMemo(
     () => filteredDevices.reduce((acc, device) => {
@@ -243,17 +253,23 @@ export default function DashboardPage() {
           </section>
         </div>
 
-        <div className="grid min-h-[560px] grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="grid min-h-[560px] grid-cols-1 gap-5">
           <section className="min-h-0">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-semibold">Devices</h2>
               <span className="text-sm text-slate-500">{filteredDevices.length} active</span>
             </div>
-            <DeviceTable devices={filteredDevices} selectedId={selected?.id} onSelect={setSelected} />
+            <DeviceTable devices={filteredDevices} selectedId={detailOpen ? detailDevice?.id : null} onSelect={openDeviceDetail} />
           </section>
-          <DeviceDetailPanel device={selected} />
         </div>
       </div>
+      <DeviceDetailModal
+        open={detailOpen}
+        device={detailDevice}
+        loading={detailLoading}
+        error={detailError}
+        onClose={closeDeviceDetail}
+      />
     </div>
   );
 }
