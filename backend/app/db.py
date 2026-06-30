@@ -147,16 +147,45 @@ class DbConnection:
         return translated, params
 
 
-def _mssql_connection_string(database: str | None = None) -> str:
-    trust = "yes" if settings.mssql_trust_server_certificate else "no"
+def mssql_connection_string(
+    *,
+    server: str,
+    database: str,
+    port: str | int | None = None,
+    auth: str = "sql",
+    username: str | None = None,
+    password: str | None = None,
+    driver: str = "ODBC Driver 18 for SQL Server",
+    encrypt: bool = True,
+    trust_server_certificate: bool = True,
+) -> str:
+    port_text = str(port or "").strip()
+    server_target = f"{server},{port_text}" if port_text and port_text != "0" else server
+    auth_mode = (auth or "sql").strip().lower()
+    auth_part = "Trusted_Connection=yes;" if auth_mode in {"windows", "trusted", "integrated"} else f"UID={username or ''};PWD={password or ''};"
+    trust = "yes" if trust_server_certificate else "no"
+    encrypt_value = "yes" if encrypt else "no"
     return (
-        f"DRIVER={{{settings.mssql_driver}}};"
-        f"SERVER={settings.mssql_server},{settings.mssql_port};"
-        f"DATABASE={database or settings.mssql_database};"
-        f"UID={settings.mssql_username};"
-        f"PWD={settings.mssql_password};"
-        "Encrypt=yes;"
+        f"DRIVER={{{driver}}};"
+        f"SERVER={server_target};"
+        f"DATABASE={database};"
+        f"{auth_part}"
+        f"Encrypt={encrypt_value};"
         f"TrustServerCertificate={trust};"
+    )
+
+
+def _mssql_connection_string(database: str | None = None) -> str:
+    return mssql_connection_string(
+        server=settings.mssql_server,
+        port=settings.mssql_port,
+        database=database or settings.mssql_database,
+        auth=settings.mssql_auth,
+        username=settings.mssql_username,
+        password=settings.mssql_password,
+        driver=settings.mssql_driver,
+        encrypt=settings.mssql_encrypt,
+        trust_server_certificate=settings.mssql_trust_server_certificate,
     )
 
 

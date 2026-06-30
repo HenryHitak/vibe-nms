@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BellRing,
+  Database,
   FileDown,
   FileUp,
   Gauge,
@@ -24,6 +25,7 @@ import AlertBell from "./components/AlertBell.jsx";
 import AlertCenter from "./pages/AlertCenter.jsx";
 import AuditLogPage from "./pages/AuditLogPage.jsx";
 import BackendInfoPage from "./pages/BackendInfoPage.jsx";
+import DatabaseConfigPage from "./pages/DatabaseConfigPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import DeviceAdminPage from "./pages/DeviceAdminPage.jsx";
 import DisplayDashboardPage from "./pages/DisplayDashboardPage.jsx";
@@ -41,9 +43,14 @@ const ADMIN_ROUTES = [
   { key: "export", label: "Excel Export", icon: FileDown, page: ExcelExportPage },
   { key: "audit", label: "Audit Logs", icon: History, page: AuditLogPage },
   { key: "monitoring", label: "Monitoring Logs", icon: ListChecks, page: MonitoringLogPage },
+  { key: "database", label: "DB Config", icon: Database, page: DatabaseConfigPage },
   { key: "backend", label: "Backend Info", icon: Server, page: BackendInfoPage },
   { key: "settings", label: "Settings", icon: Settings, page: SystemSettingsPage }
 ];
+
+function routeFromHash() {
+  return window.location.hash.replace(/^#/, "") || "dashboard";
+}
 
 function normalizeRole(value) {
   const role = String(value || "USER").toUpperCase();
@@ -51,7 +58,7 @@ function normalizeRole(value) {
 }
 
 function AuthenticatedApp() {
-  const [route, setRoute] = useState("dashboard");
+  const [route, setRoute] = useState(routeFromHash);
   const [user, setUser] = useState(getStoredUser());
   const [summary, setSummary] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -76,6 +83,20 @@ function AuthenticatedApp() {
       setRoute("dashboard");
     }
   }, [role, route]);
+
+  useEffect(() => {
+    function handleHashChange() {
+      setRoute(routeFromHash());
+    }
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (window.location.hash.replace(/^#/, "") !== route) {
+      window.location.hash = route;
+    }
+  }, [route]);
 
   useEffect(() => {
     async function loadMe() {

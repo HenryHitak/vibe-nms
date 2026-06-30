@@ -157,12 +157,26 @@ C:\Program Files\Vibe NMS\data\nms.sqlite
 If `NMS_DATABASE_ENGINE=mssql` is set in `.env`, SQL runs on the configured MS SQL Server instead:
 
 ```text
-NMS_MSSQL_SERVER=your-sql-server
-NMS_MSSQL_PORT=1433
+NMS_MSSQL_SERVER=localhost\SQLEXPRESS
+NMS_MSSQL_PORT=
 NMS_MSSQL_DATABASE=vibe_nms
+NMS_MSSQL_AUTH=sql
+NMS_MSSQL_USERNAME=sa
+NMS_MSSQL_PASSWORD=your-password
+NMS_MSSQL_DRIVER=ODBC Driver 18 for SQL Server
+NMS_MSSQL_ENCRYPT=true
+NMS_MSSQL_TRUST_SERVER_CERTIFICATE=true
 ```
 
-Admins can open `Backend Info` in the app to see the live backend process, database target, worker status, and API paths. The same data is available from `GET /api/backend/runtime` with an ADMIN bearer token.
+Admins can open `DB Config` in the app to use the SQL Server 2025 Express profile, test the connection, and save database settings to `C:\Program Files\Vibe NMS\.env`. Restart the `VibeNMS` scheduled task after saving. `Backend Info` shows the live backend process, database target, worker status, and API paths. The same data is available from `GET /api/backend/runtime` with an ADMIN bearer token.
+
+SQL Server 2025 Express design notes:
+
+- Named instance profile: `localhost\SQLEXPRESS` with blank `NMS_MSSQL_PORT`.
+- Fixed TCP profile: set `NMS_MSSQL_SERVER` to the SQL host and `NMS_MSSQL_PORT=1433`.
+- Supports SQL Login and Windows Auth through `NMS_MSSQL_AUTH=sql` or `windows`.
+- Uses `DATETIME2`, `NVARCHAR(MAX)`, `IDENTITY`, normal indexes, and foreign keys; it does not require SQL Agent, CLR, replication, or Enterprise features.
+- Backend creates the `vibe_nms` database and schema at startup when the configured login has permission.
 
 This package contains:
 
@@ -323,9 +337,11 @@ NMS_DATABASE_PATH=/app/data/nms.sqlite
 NMS_MSSQL_SERVER=mssql
 NMS_MSSQL_PORT=1433
 NMS_MSSQL_DATABASE=vibe_nms
+NMS_MSSQL_AUTH=sql
 NMS_MSSQL_USERNAME=sa
 NMS_MSSQL_PASSWORD=ChangeThisStrongPassword!123
 NMS_MSSQL_DRIVER=ODBC Driver 18 for SQL Server
+NMS_MSSQL_ENCRYPT=true
 NMS_MSSQL_TRUST_SERVER_CERTIFICATE=true
 NMS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5177,http://localhost
 NMS_TRUSTED_PROXY_IPS=10.0.0.10,10.0.0.11

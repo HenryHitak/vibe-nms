@@ -79,6 +79,20 @@ class BulkSettingsPayload(BaseModel):
     settings: dict[str, Any]
 
 
+class DatabaseConfigPayload(BaseModel):
+    database_engine: str = "mssql"
+    database_path: str | None = None
+    mssql_server: str = "localhost\\SQLEXPRESS"
+    mssql_port: str | None = None
+    mssql_database: str = "vibe_nms"
+    mssql_auth: str = "sql"
+    mssql_username: str | None = "sa"
+    mssql_password: str | None = None
+    mssql_driver: str = "ODBC Driver 18 for SQL Server"
+    mssql_encrypt: bool = True
+    mssql_trust_server_certificate: bool = True
+
+
 class DisplayDashboardRequest(BaseModel):
     plant: str | None = None
     line: str | None = None

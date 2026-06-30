@@ -7,6 +7,7 @@ import json
 import os
 import sqlite3
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
@@ -18,7 +19,7 @@ from .ap_client_discovery_worker import AP_CLIENT_ALERT_TYPES, ap_client_discove
 from .audit import changed_fields, write_audit_log
 from .auth import bearer_token_from_request, create_token, decode_token, hash_password, normalize_role, verify_password
 from .config import settings
-from .db import DEVICE_COLUMNS, connect, init_db, row_to_dict, rows_to_dicts, transaction
+from .db import DEVICE_COLUMNS, connect, init_db, mssql_connection_string, row_to_dict, rows_to_dicts, transaction
 from .import_export import (
     access_points_rows,
     audit_logs_workbook,
@@ -39,6 +40,7 @@ from .schemas import (
     APClientRegistrationPatch,
     APClientRegistrationPayload,
     BulkSettingsPayload,
+    DatabaseConfigPayload,
     DevicePatch,
     DevicePayload,
     DisplayDashboardRequest,
@@ -240,6 +242,171 @@ def _require_display_access(request: Request) -> None:
         raise HTTPException(status_code=401, detail="Display API token required")
 
 
+DATABASE_CONFIG_KEYS = [
+    "NMS_DATABASE_ENGINE",
+    "NMS_DATABASE_PATH",
+    "NMS_MSSQL_SERVER",
+    "NMS_MSSQL_PORT",
+    "NMS_MSSQL_DATABASE",
+    "NMS_MSSQL_AUTH",
+    "NMS_MSSQL_USERNAME",
+    "NMS_MSSQL_PASSWORD",
+    "NMS_MSSQL_DRIVER",
+    "NMS_MSSQL_ENCRYPT",
+    "NMS_MSSQL_TRUST_SERVER_CERTIFICATE",
+]
+
+
+def _database_env_path() -> Path:
+    explicit = os.getenv("NMS_ENV_PATH")
+    return Path(explicit) if explicit else Path.cwd() / ".env"
+
+
+def _read_env_values(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    if not path.exists():
+        return values
+    for raw_line in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip()
+    return values
+
+
+def _write_env_values(path: Path, updates: dict[str, str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = path.read_text(encoding="utf-8-sig").splitlines() if path.exists() else []
+    updated: set[str] = set()
+    next_lines: list[str] = []
+    for raw_line in lines:
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            next_lines.append(raw_line)
+            continue
+        key = stripped.split("=", 1)[0].strip()
+        if key in updates:
+            next_lines.append(f"{key}={updates[key]}")
+            updated.add(key)
+        else:
+            next_lines.append(raw_line)
+    for key, value in updates.items():
+        if key not in updated:
+            next_lines.append(f"{key}={value}")
+    path.write_text("\n".join(next_lines) + "\n", encoding="utf-8")
+
+
+def _bool_text(value: bool) -> str:
+    return "true" if value else "false"
+
+
+def _mssql_target(server: str, port: str | int | None) -> str:
+    port_text = str(port or "").strip()
+    return f"{server},{port_text}" if port_text and port_text != "0" else server
+
+
+def _mask_database_config(data: dict[str, Any], password_configured: bool) -> dict[str, Any]:
+    masked = dict(data)
+    masked.pop("mssql_password", None)
+    masked["mssql_password_configured"] = password_configured
+    masked["mssql_target"] = _mssql_target(masked.get("mssql_server", ""), masked.get("mssql_port"))
+    masked["sql_server_profile"] = "SQL Server 2025 Express"
+    return masked
+
+
+def _runtime_database_config() -> dict[str, Any]:
+    data = {
+        "database_engine": settings.database_engine,
+        "database_path": str(settings.database_path),
+        "mssql_server": settings.mssql_server,
+        "mssql_port": settings.mssql_port,
+        "mssql_database": settings.mssql_database,
+        "mssql_auth": settings.mssql_auth,
+        "mssql_username": settings.mssql_username,
+        "mssql_driver": settings.mssql_driver,
+        "mssql_encrypt": settings.mssql_encrypt,
+        "mssql_trust_server_certificate": settings.mssql_trust_server_certificate,
+    }
+    return _mask_database_config(data, bool(settings.mssql_password))
+
+
+def _pending_database_config(env_values: dict[str, str]) -> dict[str, Any]:
+    data = {
+        "database_engine": env_values.get("NMS_DATABASE_ENGINE", settings.database_engine),
+        "database_path": env_values.get("NMS_DATABASE_PATH", str(settings.database_path)),
+        "mssql_server": env_values.get("NMS_MSSQL_SERVER", settings.mssql_server),
+        "mssql_port": env_values.get("NMS_MSSQL_PORT", settings.mssql_port),
+        "mssql_database": env_values.get("NMS_MSSQL_DATABASE", settings.mssql_database),
+        "mssql_auth": env_values.get("NMS_MSSQL_AUTH", settings.mssql_auth),
+        "mssql_username": env_values.get("NMS_MSSQL_USERNAME", settings.mssql_username),
+        "mssql_driver": env_values.get("NMS_MSSQL_DRIVER", settings.mssql_driver),
+        "mssql_encrypt": str(env_values.get("NMS_MSSQL_ENCRYPT", _bool_text(settings.mssql_encrypt))).lower() in {"1", "true", "yes", "on"},
+        "mssql_trust_server_certificate": str(env_values.get("NMS_MSSQL_TRUST_SERVER_CERTIFICATE", _bool_text(settings.mssql_trust_server_certificate))).lower() in {"1", "true", "yes", "on"},
+    }
+    password_configured = bool(env_values.get("NMS_MSSQL_PASSWORD") or settings.mssql_password)
+    return _mask_database_config(data, password_configured)
+
+
+def _available_odbc_drivers() -> list[str]:
+    try:
+        import pyodbc
+
+        return [driver for driver in pyodbc.drivers() if "SQL Server" in driver]
+    except Exception:
+        return []
+
+
+def _normalized_database_payload(payload: DatabaseConfigPayload, *, for_test: bool = False) -> dict[str, Any]:
+    data = payload.model_dump()
+    data["database_engine"] = str(data.get("database_engine") or "mssql").strip().lower()
+    if data["database_engine"] not in {"sqlite", "mssql"}:
+        raise HTTPException(status_code=422, detail="Database engine must be sqlite or mssql")
+
+    data["database_path"] = str(data.get("database_path") or settings.database_path).strip()
+    data["mssql_server"] = str(data.get("mssql_server") or "localhost\\SQLEXPRESS").strip()
+    data["mssql_port"] = str(data.get("mssql_port") or "").strip()
+    data["mssql_database"] = str(data.get("mssql_database") or "vibe_nms").strip()
+    data["mssql_auth"] = str(data.get("mssql_auth") or "sql").strip().lower()
+    data["mssql_username"] = str(data.get("mssql_username") or "").strip()
+    data["mssql_driver"] = str(data.get("mssql_driver") or "ODBC Driver 18 for SQL Server").strip()
+    data["mssql_password"] = data.get("mssql_password") or settings.mssql_password
+
+    if data["database_engine"] == "sqlite":
+        return data
+    if not data["mssql_server"]:
+        raise HTTPException(status_code=422, detail="SQL Server is required")
+    if not data["mssql_database"]:
+        raise HTTPException(status_code=422, detail="Database name is required")
+    if data["mssql_auth"] not in {"sql", "windows"}:
+        raise HTTPException(status_code=422, detail="Authentication must be sql or windows")
+    if data["mssql_auth"] == "sql" and not data["mssql_username"]:
+        raise HTTPException(status_code=422, detail="SQL username is required")
+    if for_test and data["mssql_auth"] == "sql" and not data["mssql_password"]:
+        raise HTTPException(status_code=422, detail="SQL password is required for connection test")
+    if not data["mssql_driver"]:
+        raise HTTPException(status_code=422, detail="ODBC driver is required")
+    return data
+
+
+def _database_env_updates(data: dict[str, Any], payload: DatabaseConfigPayload) -> dict[str, str]:
+    updates = {
+        "NMS_DATABASE_ENGINE": data["database_engine"],
+        "NMS_DATABASE_PATH": data["database_path"],
+        "NMS_MSSQL_SERVER": data["mssql_server"],
+        "NMS_MSSQL_PORT": data["mssql_port"],
+        "NMS_MSSQL_DATABASE": data["mssql_database"],
+        "NMS_MSSQL_AUTH": data["mssql_auth"],
+        "NMS_MSSQL_USERNAME": data["mssql_username"],
+        "NMS_MSSQL_DRIVER": data["mssql_driver"],
+        "NMS_MSSQL_ENCRYPT": _bool_text(bool(data.get("mssql_encrypt"))),
+        "NMS_MSSQL_TRUST_SERVER_CERTIFICATE": _bool_text(bool(data.get("mssql_trust_server_certificate"))),
+    }
+    if payload.mssql_password:
+        updates["NMS_MSSQL_PASSWORD"] = payload.mssql_password
+    return updates
+
+
 def _device_filter_clauses(filters: dict[str, Any], alias: str = "d", include_deleted_clause: bool = True) -> tuple[list[str], list[Any]]:
     clauses: list[str] = []
     params: list[Any] = []
@@ -437,8 +604,13 @@ def backend_runtime(actor: Actor = Depends(get_actor)) -> dict[str, Any]:
             "server": settings.mssql_server,
             "port": settings.mssql_port,
             "database": settings.mssql_database,
+            "auth": settings.mssql_auth,
+            "username": settings.mssql_username if settings.mssql_auth == "sql" else "",
             "driver": settings.mssql_driver,
+            "encrypt": settings.mssql_encrypt,
             "trust_server_certificate": settings.mssql_trust_server_certificate,
+            "target": _mssql_target(settings.mssql_server, settings.mssql_port),
+            "profile": "SQL Server 2025 Express",
         }
     else:
         database = {
@@ -472,6 +644,144 @@ def backend_runtime(actor: Actor = Depends(get_actor)) -> dict[str, Any]:
             "dashboard_get": "/api/display/dashboard",
             "dashboard_post": "/api/display/dashboard",
             "display_page": "/display",
+            "database_config": "/api/database/config",
+        },
+    }
+
+
+@app.get("/api/database/config")
+def get_database_config(actor: Actor = Depends(get_actor)) -> dict[str, Any]:
+    require_admin(actor)
+    env_path = _database_env_path()
+    env_values = _read_env_values(env_path)
+    runtime = _runtime_database_config()
+    pending = _pending_database_config(env_values)
+    return {
+        "env_path": str(env_path),
+        "runtime": runtime,
+        "pending": pending,
+        "drivers": _available_odbc_drivers(),
+        "restart_required": pending != runtime,
+        "restart": {
+            "task_name": "VibeNMS",
+            "stop": "Stop-ScheduledTask -TaskName VibeNMS",
+            "start": "Start-ScheduledTask -TaskName VibeNMS",
+        },
+        "recommended": {
+            "database_engine": "mssql",
+            "mssql_server": "localhost\\SQLEXPRESS",
+            "mssql_port": "",
+            "mssql_database": "vibe_nms",
+            "mssql_auth": "sql",
+            "mssql_username": "sa",
+            "mssql_driver": "ODBC Driver 18 for SQL Server",
+            "mssql_encrypt": True,
+            "mssql_trust_server_certificate": True,
+            "profile": "SQL Server 2025 Express",
+        },
+    }
+
+
+@app.post("/api/database/config/test")
+def test_database_config(payload: DatabaseConfigPayload, actor: Actor = Depends(get_actor)) -> dict[str, Any]:
+    require_admin(actor)
+    data = _normalized_database_payload(payload, for_test=True)
+    if data["database_engine"] == "sqlite":
+        path = Path(data["database_path"])
+        return {
+            "ok": True,
+            "engine": "sqlite",
+            "message": f"SQLite path is valid. Parent: {path.parent}",
+            "database_path": str(path),
+        }
+
+    try:
+        import pyodbc
+
+        connection_string = mssql_connection_string(
+            server=data["mssql_server"],
+            port=data["mssql_port"],
+            database="master",
+            auth=data["mssql_auth"],
+            username=data["mssql_username"],
+            password=data["mssql_password"],
+            driver=data["mssql_driver"],
+            encrypt=bool(data["mssql_encrypt"]),
+            trust_server_certificate=bool(data["mssql_trust_server_certificate"]),
+        )
+        raw = pyodbc.connect(connection_string, timeout=5, autocommit=True)
+        cursor = raw.cursor()
+        version = cursor.execute("SELECT CONVERT(NVARCHAR(4000), @@VERSION)").fetchone()[0]
+        info = cursor.execute(
+            """
+            SELECT
+                CONVERT(NVARCHAR(200), SERVERPROPERTY('Edition')) AS edition,
+                CONVERT(NVARCHAR(80), SERVERPROPERTY('ProductVersion')) AS product_version,
+                DB_ID(?) AS database_id
+            """,
+            data["mssql_database"],
+        ).fetchone()
+        raw.close()
+        edition = str(info[0] or "")
+        return {
+            "ok": True,
+            "engine": "mssql",
+            "target": _mssql_target(data["mssql_server"], data["mssql_port"]),
+            "database": data["mssql_database"],
+            "database_exists": info[2] is not None,
+            "edition": edition,
+            "product_version": str(info[1] or ""),
+            "version": version,
+            "is_express": "express" in edition.lower(),
+            "message": "Connection succeeded. Vibe NMS can create the database on restart if it does not exist.",
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "engine": "mssql",
+            "target": _mssql_target(data["mssql_server"], data["mssql_port"]),
+            "database": data["mssql_database"],
+            "message": str(exc),
+        }
+
+
+@app.put("/api/database/config")
+def update_database_config(payload: DatabaseConfigPayload, actor: Actor = Depends(get_actor)) -> dict[str, Any]:
+    require_admin(actor)
+    data = _normalized_database_payload(payload)
+    env_path = _database_env_path()
+    env_values = _read_env_values(env_path)
+    if (
+        data["database_engine"] == "mssql"
+        and data["mssql_auth"] == "sql"
+        and not payload.mssql_password
+        and not env_values.get("NMS_MSSQL_PASSWORD")
+        and not settings.mssql_password
+    ):
+        raise HTTPException(status_code=422, detail="SQL password is required before saving SQL Login config")
+    before = _pending_database_config(env_values)
+    _write_env_values(env_path, _database_env_updates(data, payload))
+    after = _pending_database_config(_read_env_values(env_path))
+    with transaction() as conn:
+        write_audit_log(
+            conn,
+            actor,
+            "UPDATE",
+            "DATABASE_CONFIG",
+            before_data=before,
+            after_data=after,
+            changed=changed_fields(before, after),
+        )
+    return {
+        "status": "saved",
+        "env_path": str(env_path),
+        "runtime": _runtime_database_config(),
+        "pending": after,
+        "restart_required": True,
+        "restart": {
+            "task_name": "VibeNMS",
+            "stop": "Stop-ScheduledTask -TaskName VibeNMS",
+            "start": "Start-ScheduledTask -TaskName VibeNMS",
         },
     }
 

@@ -23,6 +23,8 @@ if (Test-Path $envPath) {
     }
 }
 
+[Environment]::SetEnvironmentVariable("NMS_ENV_PATH", $envPath, "Process")
+
 if (-not $env:NMS_DATABASE_PATH) {
     $env:NMS_DATABASE_PATH = Join-Path $installDir "data\nms.sqlite"
 }

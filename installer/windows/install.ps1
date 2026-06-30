@@ -235,6 +235,15 @@ if (-not (Test-Path $envPath)) {
 NMS_PORT=$Port
 NMS_DATABASE_ENGINE=sqlite
 NMS_DATABASE_PATH=$InstallDir\data\nms.sqlite
+NMS_MSSQL_SERVER=localhost\SQLEXPRESS
+NMS_MSSQL_PORT=
+NMS_MSSQL_DATABASE=vibe_nms
+NMS_MSSQL_AUTH=sql
+NMS_MSSQL_USERNAME=sa
+NMS_MSSQL_PASSWORD=
+NMS_MSSQL_DRIVER=ODBC Driver 18 for SQL Server
+NMS_MSSQL_ENCRYPT=true
+NMS_MSSQL_TRUST_SERVER_CERTIFICATE=true
 NMS_FRONTEND_DIST=$InstallDir\frontend\dist
 NMS_ALLOWED_ORIGINS=$allowedOrigins
 NMS_CORPORATE_NETWORKS=$corporateNetworks
@@ -285,6 +294,29 @@ NMS_DISPLAY_API_TOKEN=
     }
     if (-not $displayTokenExists) {
         $envLines += "NMS_DISPLAY_API_TOKEN="
+    }
+    $missingOnlyValues = @{
+        "NMS_MSSQL_SERVER" = "localhost\SQLEXPRESS"
+        "NMS_MSSQL_PORT" = ""
+        "NMS_MSSQL_DATABASE" = "vibe_nms"
+        "NMS_MSSQL_AUTH" = "sql"
+        "NMS_MSSQL_USERNAME" = "sa"
+        "NMS_MSSQL_PASSWORD" = ""
+        "NMS_MSSQL_DRIVER" = "ODBC Driver 18 for SQL Server"
+        "NMS_MSSQL_ENCRYPT" = "true"
+        "NMS_MSSQL_TRUST_SERVER_CERTIFICATE" = "true"
+    }
+    foreach ($key in $missingOnlyValues.Keys) {
+        $exists = $false
+        foreach ($line in $envLines) {
+            if ($line -match "^$([regex]::Escape($key))=") {
+                $exists = $true
+                break
+            }
+        }
+        if (-not $exists) {
+            $envLines += "$key=$($missingOnlyValues[$key])"
+        }
     }
     $envLines | Set-Content -LiteralPath $envPath -Encoding UTF8
 }

@@ -73,8 +73,14 @@ export default function BackendInfoPage() {
             <>
               <InfoRow label="Server" value={db.server} />
               <InfoRow label="Port" value={db.port} />
+              <InfoRow label="Target" value={db.target} />
               <InfoRow label="Database" value={db.database} />
+              <InfoRow label="Profile" value={db.profile} />
+              <InfoRow label="Auth" value={db.auth} />
+              <InfoRow label="Username" value={db.username} />
               <InfoRow label="Driver" value={db.driver} />
+              <InfoRow label="Encrypt" value={db.encrypt ? "Yes" : "No"} />
+              <InfoRow label="Trust Cert" value={db.trust_server_certificate ? "Yes" : "No"} />
             </>
           ) : (
             <>

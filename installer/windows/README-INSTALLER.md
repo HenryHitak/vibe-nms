@@ -94,15 +94,32 @@ NMS_TIME_ZONE=America/Tijuana
 
 This affects Audit Logs, Monitoring Logs, Alerts, AP Clients, and Display Dashboard display times. Audit Logs date filters are also interpreted in this timezone.
 
-For MS SQL Server, change the database settings in `.env`:
+For SQL Server 2025 Express, use the in-app screen:
+
+```text
+Admin menu -> DB Config
+```
+
+Recommended SQL Server 2025 Express settings:
 
 ```text
 NMS_DATABASE_ENGINE=mssql
-NMS_MSSQL_SERVER=your-sql-server
-NMS_MSSQL_PORT=1433
+NMS_MSSQL_SERVER=localhost\SQLEXPRESS
+NMS_MSSQL_PORT=
 NMS_MSSQL_DATABASE=vibe_nms
+NMS_MSSQL_AUTH=sql
 NMS_MSSQL_USERNAME=sa
 NMS_MSSQL_PASSWORD=your-password
+NMS_MSSQL_DRIVER=ODBC Driver 18 for SQL Server
+NMS_MSSQL_ENCRYPT=true
+NMS_MSSQL_TRUST_SERVER_CERTIFICATE=true
+```
+
+Leave `NMS_MSSQL_PORT` blank for the default `SQLEXPRESS` named instance. Use `1433` only when SQL Server Express is configured with a fixed TCP port. After saving DB Config, restart the scheduled task:
+
+```powershell
+Stop-ScheduledTask -TaskName VibeNMS
+Start-ScheduledTask -TaskName VibeNMS
 ```
 
 AP controller API tokens also go in `.env`; they are only read by the backend process and are not exposed to the browser.
