@@ -23,13 +23,11 @@ from .validation import (
 
 
 TEMPLATE_COLUMNS = [
-    ("Plant Code", "plant_code"),
     ("Plant Name", "plant_name"),
     ("Building", "building"),
     ("Floor", "floor"),
     ("Area", "area"),
     ("Zone", "zone"),
-    ("Line Code", "line_code"),
     ("Line Name", "line_name"),
     ("Detailed Location", "detailed_location"),
     ("Device Name", "device_name"),
@@ -70,13 +68,11 @@ def build_template_workbook() -> bytes:
     sheet.title = "devices"
     sheet.append([header for header, _field in TEMPLATE_COLUMNS])
     sample = {
-        "plant_code": "MX01",
         "plant_name": "Main Plant",
         "building": "A",
         "floor": "1",
         "area": "Assembly",
         "zone": "A1",
-        "line_code": "LINE-01",
         "line_name": "Assembly Line 1",
         "detailed_location": "Scanner station",
         "device_name": "LINE1_SCANNER_03",
@@ -163,7 +159,11 @@ def validate_import_rows(conn: sqlite3.Connection, payload: bytes) -> list[dict[
         errors: list[str] = []
         warnings: list[str] = []
 
-        for field in ("plant_code", "line_code", "device_name", "device_type", "ip_address"):
+        if row.get("plant_name") and not row.get("plant_code"):
+            row["plant_code"] = row["plant_name"]
+        if row.get("line_name") and not row.get("line_code"):
+            row["line_code"] = row["line_name"]
+        for field in ("plant_name", "line_name", "device_name", "device_type", "ip_address"):
             if not row.get(field):
                 errors.append(f"Missing {field.replace('_', ' ')}")
 
@@ -397,18 +397,18 @@ def commit_import_job(conn: sqlite3.Connection, import_job_id: int, actor: Actor
 
 def devices_rows(conn: sqlite3.Connection, include_deleted: bool = False) -> list[dict[str, Any]]:
     where = "" if include_deleted else "WHERE is_deleted = 0"
-    return rows_to_dicts(conn.execute(f"SELECT * FROM network_devices {where} ORDER BY plant_code, line_code, device_name").fetchall())
+    return rows_to_dicts(conn.execute(f"SELECT * FROM network_devices {where} ORDER BY COALESCE(plant_name, plant_code), COALESCE(line_name, line_code), device_name").fetchall())
 
 
 def plants_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return rows_to_dicts(
         conn.execute(
             """
-            SELECT plant_code, MAX(plant_name) AS plant_name, COUNT(*) AS device_count
+            SELECT COALESCE(plant_name, plant_code) AS plant_name, COUNT(*) AS device_count
             FROM network_devices
             WHERE is_deleted = 0
-            GROUP BY plant_code
-            ORDER BY plant_code
+            GROUP BY COALESCE(plant_name, plant_code)
+            ORDER BY COALESCE(plant_name, plant_code)
             """
         ).fetchall()
     )
@@ -418,11 +418,14 @@ def access_points_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return rows_to_dicts(
         conn.execute(
             """
-            SELECT connected_ap_name, connected_ap_ip, plant_code, line_code, COUNT(*) AS connected_device_count
+            SELECT connected_ap_name, connected_ap_ip,
+                   COALESCE(plant_name, plant_code) AS plant_name,
+                   COALESCE(line_name, line_code) AS line_name,
+                   COUNT(*) AS connected_device_count
             FROM network_devices
             WHERE is_deleted = 0 AND connected_ap_name IS NOT NULL AND connected_ap_name != ''
-            GROUP BY connected_ap_name, connected_ap_ip, plant_code, line_code
-            ORDER BY plant_code, line_code, connected_ap_name
+            GROUP BY connected_ap_name, connected_ap_ip, COALESCE(plant_name, plant_code), COALESCE(line_name, line_code)
+            ORDER BY COALESCE(plant_name, plant_code), COALESCE(line_name, line_code), connected_ap_name
             """
         ).fetchall()
     )
@@ -432,11 +435,13 @@ def lines_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return rows_to_dicts(
         conn.execute(
             """
-            SELECT plant_code, line_code, MAX(line_name) AS line_name, COUNT(*) AS device_count
+            SELECT COALESCE(plant_name, plant_code) AS plant_name,
+                   COALESCE(line_name, line_code) AS line_name,
+                   COUNT(*) AS device_count
             FROM network_devices
             WHERE is_deleted = 0
-            GROUP BY plant_code, line_code
-            ORDER BY plant_code, line_code
+            GROUP BY COALESCE(plant_name, plant_code), COALESCE(line_name, line_code)
+            ORDER BY COALESCE(plant_name, plant_code), COALESCE(line_name, line_code)
             """
         ).fetchall()
     )
@@ -446,11 +451,11 @@ def locations_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return rows_to_dicts(
         conn.execute(
             """
-            SELECT plant_code, building, floor, area, zone, COUNT(*) AS device_count
+            SELECT COALESCE(plant_name, plant_code) AS plant_name, building, floor, area, zone, COUNT(*) AS device_count
             FROM network_devices
             WHERE is_deleted = 0
-            GROUP BY plant_code, building, floor, area, zone
-            ORDER BY plant_code, building, floor, area, zone
+            GROUP BY COALESCE(plant_name, plant_code), building, floor, area, zone
+            ORDER BY COALESCE(plant_name, plant_code), building, floor, area, zone
             """
         ).fetchall()
     )

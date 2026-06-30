@@ -5,13 +5,11 @@ import AdminLayout from "../components/AdminLayout.jsx";
 import DeviceTable from "../components/DeviceTable.jsx";
 
 const EMPTY_DEVICE = {
-  plant_code: "",
   plant_name: "",
   building: "",
   floor: "",
   area: "",
   zone: "",
-  line_code: "",
   line_name: "",
   detailed_location: "",
   device_name: "",
@@ -88,6 +86,8 @@ export default function DeviceAdminPage() {
     try {
       const payload = {
         ...form,
+        plant_code: form.plant_name,
+        line_code: form.line_name,
         vlan: form.vlan === "" || form.vlan == null ? null : Number(form.vlan),
         monitoring_enabled: true
       };
@@ -169,9 +169,7 @@ export default function DeviceAdminPage() {
             </button>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-1">
-            <Field label="Plant Code" name="plant_code" value={form.plant_code} onChange={updateForm} />
             <Field label="Plant Name" name="plant_name" value={form.plant_name} onChange={updateForm} />
-            <Field label="Line Code" name="line_code" value={form.line_code} onChange={updateForm} />
             <Field label="Line Name" name="line_name" value={form.line_name} onChange={updateForm} />
             <Field label="Device Name" name="device_name" value={form.device_name} onChange={updateForm} />
             <label className="block text-sm">

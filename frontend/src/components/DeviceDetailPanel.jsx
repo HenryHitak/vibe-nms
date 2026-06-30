@@ -46,8 +46,8 @@ export default function DeviceDetailPanel({ device }) {
         </div>
         <div className="rounded-md border border-line p-3">
           <MapPin size={16} className="mb-2 text-slate-500" />
-          <div className="font-semibold">{device.plant_code}</div>
-          <div className="text-slate-500">{device.line_code}</div>
+          <div className="font-semibold">{device.plant_name || device.plant_code}</div>
+          <div className="text-slate-500">{device.line_name || device.line_code}</div>
         </div>
       </div>
 
@@ -63,4 +63,3 @@ export default function DeviceDetailPanel({ device }) {
     </aside>
   );
 }
-

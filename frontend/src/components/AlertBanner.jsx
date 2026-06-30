@@ -7,10 +7,10 @@ export default function AlertBanner({ alerts = [] }) {
   const severityRank = { CRITICAL: 0, WARNING: 1, INFO: 2 };
   const sorted = [...activeAlerts].sort((a, b) => (severityRank[a.severity] ?? 9) - (severityRank[b.severity] ?? 9));
   const plantCounts = sorted.reduce((acc, alert) => {
-    const plant = alert.plant_code || "UNKNOWN";
-    acc[plant] = acc[plant] || { plant_code: plant, count: 0, lines: new Set(), severity: alert.severity };
+    const plant = alert.plant_name || alert.plant_code || "UNKNOWN";
+    acc[plant] = acc[plant] || { plant_name: plant, count: 0, lines: new Set(), severity: alert.severity };
     acc[plant].count += 1;
-    if (alert.line_code) acc[plant].lines.add(alert.line_code);
+    if (alert.line_name || alert.line_code) acc[plant].lines.add(alert.line_name || alert.line_code);
     if ((severityRank[alert.severity] ?? 9) < (severityRank[acc[plant].severity] ?? 9)) acc[plant].severity = alert.severity;
     return acc;
   }, {});
@@ -32,7 +32,7 @@ export default function AlertBanner({ alerts = [] }) {
         <span className={`mx-2 ${divider}`}>/</span>
         {isPlantDrop ? (
           <>
-            <span className="font-semibold">Plant {plantImpact.plant_code}</span>
+            <span className="font-semibold">Plant {plantImpact.plant_name}</span>
             <span className={`mx-2 ${divider}`}>/</span>
             <span>{plantImpact.count} active network alerts</span>
             <span className={`mx-2 ${divider}`}>/</span>
@@ -40,9 +40,9 @@ export default function AlertBanner({ alerts = [] }) {
           </>
         ) : (
           <>
-            <span>Plant {alert.plant_code || "-"}</span>
+            <span>Plant {alert.plant_name || alert.plant_code || "-"}</span>
             <span className={`mx-2 ${divider}`}>/</span>
-            <span>{alert.line_code || "LINE"}</span>
+            <span>{alert.line_name || alert.line_code || "LINE"}</span>
             <span className={`mx-2 ${divider}`}>/</span>
             <span>{alert.device_name || "Device"}</span>
             <span className={`mx-2 ${divider}`}>/</span>

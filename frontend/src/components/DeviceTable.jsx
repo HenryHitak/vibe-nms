@@ -27,8 +27,8 @@ export default function DeviceTable({ devices = [], selectedId, onSelect, action
               <td className="px-3 py-2"><StatusBadge status={device.status} /></td>
               <td className="px-3 py-2 font-semibold text-ink">{device.device_name}</td>
               <td className="px-3 py-2 tabular-nums">{device.ip_address}</td>
-              <td className="px-3 py-2">{device.plant_code}</td>
-              <td className="px-3 py-2">{device.line_code}</td>
+              <td className="px-3 py-2">{device.plant_name || device.plant_code}</td>
+              <td className="px-3 py-2">{device.line_name || device.line_code}</td>
               <td className="px-3 py-2">{device.connected_ap_name || "-"}</td>
               <td className="px-3 py-2">{[device.switch_name, device.switch_port].filter(Boolean).join(" / ") || "-"}</td>
               <td className="px-3 py-2 tabular-nums">{device.packet_loss_percent ?? "-"}</td>
@@ -49,4 +49,3 @@ export default function DeviceTable({ devices = [], selectedId, onSelect, action
     </div>
   );
 }
-

@@ -260,13 +260,13 @@ def init_db() -> None:
 
             CREATE TABLE IF NOT EXISTS network_devices (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                plant_code TEXT NOT NULL,
+                plant_code TEXT,
                 plant_name TEXT,
                 building TEXT,
                 floor TEXT,
                 area TEXT,
                 zone TEXT,
-                line_code TEXT NOT NULL,
+                line_code TEXT,
                 line_name TEXT,
                 detailed_location TEXT,
                 device_name TEXT NOT NULL,

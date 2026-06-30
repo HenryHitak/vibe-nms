@@ -53,17 +53,24 @@ export default function DashboardPage() {
   }, []);
 
   const plantOptions = useMemo(
-    () => [...new Set(devices.map((device) => device.plant_code).filter(Boolean))].sort(),
+    () => [...new Set(devices.map((device) => device.plant_name || device.plant_code).filter(Boolean))].sort(),
     [devices]
   );
 
   const lineOptions = useMemo(
-    () => [...new Set(devices.filter((device) => !plantFilter || device.plant_code === plantFilter).map((device) => device.line_code).filter(Boolean))].sort(),
+    () => [...new Set(devices
+      .filter((device) => !plantFilter || (device.plant_name || device.plant_code) === plantFilter)
+      .map((device) => device.line_name || device.line_code)
+      .filter(Boolean))].sort(),
     [devices, plantFilter]
   );
 
   const filteredDevices = useMemo(
-    () => devices.filter((device) => (!plantFilter || device.plant_code === plantFilter) && (!lineFilter || device.line_code === lineFilter)),
+    () => devices.filter((device) => {
+      const plantName = device.plant_name || device.plant_code;
+      const lineName = device.line_name || device.line_code;
+      return (!plantFilter || plantName === plantFilter) && (!lineFilter || lineName === lineFilter);
+    }),
     [devices, plantFilter, lineFilter]
   );
 
@@ -94,10 +101,9 @@ export default function DashboardPage() {
   const plantImpact = useMemo(() => {
     const plants = new Map();
     for (const device of devices) {
-      const key = device.plant_code || "UNKNOWN";
+      const key = device.plant_name || device.plant_code || "UNKNOWN";
       const current = plants.get(key) || {
-        plant_code: key,
-        plant_name: device.plant_name || key,
+        plant_name: key,
         total: 0,
         online: 0,
         warning: 0,
@@ -105,7 +111,7 @@ export default function DashboardPage() {
         lines: new Set()
       };
       current.total += 1;
-      current.lines.add(device.line_code);
+      current.lines.add(device.line_name || device.line_code);
       if (device.status === "ONLINE") current.online += 1;
       else if (["WARNING", "UNCERTAIN", "FLAPPING"].includes(device.status)) current.warning += 1;
       else if (["OFFLINE", "CRITICAL"].includes(device.status)) current.offline += 1;
@@ -113,7 +119,7 @@ export default function DashboardPage() {
     }
     return [...plants.values()]
       .map((plant) => ({ ...plant, line_count: plant.lines.size }))
-      .sort((a, b) => b.offline - a.offline || b.warning - a.warning || a.plant_code.localeCompare(b.plant_code));
+      .sort((a, b) => b.offline - a.offline || b.warning - a.warning || a.plant_name.localeCompare(b.plant_name));
   }, [devices]);
 
   const chartCounts = useMemo(
@@ -122,7 +128,7 @@ export default function DashboardPage() {
   );
   const trend = useMemo(
     () => [...(summary?.recent_metrics || [])]
-      .filter((row) => (!plantFilter || row.plant_code === plantFilter) && (!lineFilter || row.line_code === lineFilter))
+      .filter((row) => (!plantFilter || (row.plant_name || row.plant_code) === plantFilter) && (!lineFilter || (row.line_name || row.line_code) === lineFilter))
       .reverse()
       .slice(-30)
       .map((row, index) => ({
@@ -175,14 +181,14 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
             {plantImpact.slice(0, 8).map((plant) => (
               <button
-                key={plant.plant_code}
-                className={`rounded-md border p-3 text-left transition-colors ${plantFilter === plant.plant_code ? "border-cyan-400 bg-cyan-50" : "border-line bg-slate-50 hover:bg-white"}`}
-                onClick={() => setPlantFilter(plant.plant_code)}
+                key={plant.plant_name}
+                className={`rounded-md border p-3 text-left transition-colors ${plantFilter === plant.plant_name ? "border-cyan-400 bg-cyan-50" : "border-line bg-slate-50 hover:bg-white"}`}
+                onClick={() => setPlantFilter(plant.plant_name)}
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="truncate font-semibold text-ink">{plant.plant_code}</div>
-                    <div className="truncate text-xs text-slate-500">{plant.plant_name}</div>
+                    <div className="truncate font-semibold text-ink">{plant.plant_name}</div>
+                    <div className="truncate text-xs text-slate-500">{plant.line_count} lines</div>
                   </div>
                   <div className={`h-3 w-3 rounded-full ${plant.offline ? "bg-red-nms" : plant.warning ? "bg-orange-nms" : "bg-green-nms"}`} />
                 </div>

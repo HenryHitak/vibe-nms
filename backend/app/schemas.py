@@ -6,13 +6,13 @@ from pydantic import BaseModel, Field
 
 
 class DevicePayload(BaseModel):
-    plant_code: str
+    plant_code: str | None = None
     plant_name: str | None = None
     building: str | None = None
     floor: str | None = None
     area: str | None = None
     zone: str | None = None
-    line_code: str
+    line_code: str | None = None
     line_name: str | None = None
     detailed_location: str | None = None
     device_name: str

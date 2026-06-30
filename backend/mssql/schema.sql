@@ -41,13 +41,13 @@ IF OBJECT_ID(N'dbo.network_devices', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.network_devices (
         id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-        plant_code NVARCHAR(80) NOT NULL,
+        plant_code NVARCHAR(200) NULL,
         plant_name NVARCHAR(200) NULL,
         building NVARCHAR(120) NULL,
         floor NVARCHAR(80) NULL,
         area NVARCHAR(160) NULL,
         zone NVARCHAR(160) NULL,
-        line_code NVARCHAR(80) NOT NULL,
+        line_code NVARCHAR(200) NULL,
         line_name NVARCHAR(200) NULL,
         detailed_location NVARCHAR(500) NULL,
         device_name NVARCHAR(200) NOT NULL,
@@ -260,4 +260,3 @@ ON target.role_name = source.role_name
 WHEN NOT MATCHED THEN
     INSERT(role_name, permissions_json) VALUES(source.role_name, source.permissions_json);
 GO
-

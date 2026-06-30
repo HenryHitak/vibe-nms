@@ -144,7 +144,15 @@ def _audit_failure(actor: Actor, action_type: str, entity_type: str, error: Exce
 
 
 def _validate_device_data(data: dict[str, Any], partial: bool = False) -> dict[str, Any]:
-    required = ["plant_code", "line_code", "device_name", "device_type", "ip_address"]
+    if data.get("plant_name") and not data.get("plant_code"):
+        data["plant_code"] = data["plant_name"]
+    if data.get("line_name") and not data.get("line_code"):
+        data["line_code"] = data["line_name"]
+    if data.get("plant_code") and not data.get("plant_name"):
+        data["plant_name"] = data["plant_code"]
+    if data.get("line_code") and not data.get("line_name"):
+        data["line_name"] = data["line_code"]
+    required = ["plant_name", "line_name", "device_name", "device_type", "ip_address"]
     if not partial:
         for field in required:
             if not data.get(field):
@@ -265,18 +273,20 @@ def dashboard_summary() -> dict[str, Any]:
         by_plant = rows_to_dicts(
             conn.execute(
                 """
-                SELECT plant_code, COALESCE(MAX(plant_name), plant_code) AS plant_name, status, COUNT(*) AS count
+                SELECT COALESCE(plant_name, plant_code) AS plant_name, status, COUNT(*) AS count
                 FROM network_devices
                 WHERE is_deleted = 0
-                GROUP BY plant_code, status
-                ORDER BY plant_code, status
+                GROUP BY COALESCE(plant_name, plant_code), status
+                ORDER BY COALESCE(plant_name, plant_code), status
                 """
             ).fetchall()
         )
         recent_alerts = rows_to_dicts(
             conn.execute(
                 """
-                SELECT a.*, d.device_name, d.ip_address, d.plant_code, d.line_code
+                SELECT a.*, d.device_name, d.ip_address,
+                       COALESCE(d.plant_name, d.plant_code) AS plant_name,
+                       COALESCE(d.line_name, d.line_code) AS line_name
                 FROM alerts a
                 LEFT JOIN network_devices d ON d.id = a.device_id
                 WHERE a.status IN ('ACTIVE', 'ACKNOWLEDGED')
@@ -289,7 +299,9 @@ def dashboard_summary() -> dict[str, Any]:
             conn.execute(
                 """
                 SELECT m.checked_at, m.status, m.latency_ms, m.packet_loss_percent,
-                       d.device_name, d.ip_address, d.plant_code, d.line_code
+                       d.device_name, d.ip_address,
+                       COALESCE(d.plant_name, d.plant_code) AS plant_name,
+                       COALESCE(d.line_name, d.line_code) AS line_name
                 FROM device_metrics m
                 JOIN network_devices d ON d.id = m.device_id
                 ORDER BY m.checked_at DESC, m.id DESC
@@ -325,10 +337,10 @@ def list_devices(
         clauses.append("status = ?")
         params.append(status.upper())
     if plant:
-        clauses.append("plant_code = ?")
+        clauses.append("COALESCE(plant_name, plant_code) = ?")
         params.append(plant)
     if line:
-        clauses.append("line_code = ?")
+        clauses.append("COALESCE(line_name, line_code) = ?")
         params.append(line)
     if q:
         clauses.append("(device_name LIKE ? OR ip_address LIKE ? OR hostname LIKE ? OR connected_ap_name LIKE ?)")
@@ -342,7 +354,7 @@ def list_devices(
                    (SELECT COUNT(*) FROM alerts a WHERE a.device_id = d.id AND a.status = 'ACTIVE') AS active_alert_count
             FROM network_devices d
             {where}
-            ORDER BY d.plant_code, d.line_code, d.device_name
+            ORDER BY COALESCE(d.plant_name, d.plant_code), COALESCE(d.line_name, d.line_code), d.device_name
             """,
             params,
         ).fetchall()
@@ -687,7 +699,9 @@ def monitoring_logs(
     with transaction() as conn:
         rows = conn.execute(
             f"""
-            SELECT m.*, d.device_name, d.ip_address, d.plant_code, d.line_code
+            SELECT m.*, d.device_name, d.ip_address,
+                   COALESCE(d.plant_name, d.plant_code) AS plant_name,
+                   COALESCE(d.line_name, d.line_code) AS line_name
             FROM device_metrics m
             JOIN network_devices d ON d.id = m.device_id
             {where}
@@ -716,7 +730,10 @@ def list_alerts(status: str | None = None) -> list[dict[str, Any]]:
     with transaction() as conn:
         rows = conn.execute(
             f"""
-            SELECT a.*, d.device_name, d.ip_address, d.plant_code, d.line_code, d.connected_ap_name
+            SELECT a.*, d.device_name, d.ip_address,
+                   COALESCE(d.plant_name, d.plant_code) AS plant_name,
+                   COALESCE(d.line_name, d.line_code) AS line_name,
+                   d.connected_ap_name
             FROM alerts a
             LEFT JOIN network_devices d ON d.id = a.device_id
             {where}
