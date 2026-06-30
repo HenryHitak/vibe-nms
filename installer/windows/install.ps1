@@ -100,8 +100,43 @@ function Wait-ForDashboard {
     }
 }
 
+function Get-LanIPv4Addresses {
+    $addresses = @()
+    try {
+        $addresses += Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
+            Where-Object {
+                $_.IPAddress -and
+                $_.IPAddress -notlike "127.*" -and
+                $_.IPAddress -notlike "169.254.*" -and
+                $_.IPAddress -notlike "0.*"
+            } |
+            Sort-Object InterfaceMetric, InterfaceIndex |
+            Select-Object -ExpandProperty IPAddress
+    } catch {
+        $ipconfig = cmd.exe /c ipconfig
+        $addresses += [regex]::Matches(($ipconfig -join "`n"), "(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])") |
+            ForEach-Object { $_.Value } |
+            Where-Object { $_ -notlike "127.*" -and $_ -notlike "169.254.*" -and $_ -notlike "0.*" }
+    }
+
+    $addresses |
+        Where-Object { $_ } |
+        Select-Object -Unique
+}
+
+function Get-AccessUrls {
+    param([int]$Port)
+
+    $urls = @("http://localhost:$Port")
+    foreach ($address in Get-LanIPv4Addresses) {
+        $urls += "http://$address`:$Port"
+    }
+    $urls | Select-Object -Unique
+}
+
 Stop-ExistingTask -TaskName $taskName
 Stop-VibeNmsPortListeners -Port $Port -InstallDir $InstallDir -PackageRoot $packageRoot
+$accessUrls = @(Get-AccessUrls -Port $Port)
 
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $InstallDir "data") -Force | Out-Null
@@ -122,12 +157,13 @@ if (-not (Test-Path $frontendIndex)) {
 
 $envPath = Join-Path $InstallDir ".env"
 if (-not (Test-Path $envPath)) {
+    $allowedOrigins = $accessUrls -join ","
     @"
 NMS_PORT=$Port
 NMS_DATABASE_ENGINE=sqlite
 NMS_DATABASE_PATH=$InstallDir\data\nms.sqlite
 NMS_FRONTEND_DIST=$InstallDir\frontend\dist
-NMS_ALLOWED_ORIGINS=http://localhost:$Port,http://127.0.0.1:$Port
+NMS_ALLOWED_ORIGINS=$allowedOrigins
 NMS_COLLECTOR_ENABLED=true
 NMS_AP_CLIENT_DISCOVERY_ENABLED=true
 NMS_AP_CLIENT_DEFAULT_PROVIDER=demo
@@ -141,7 +177,7 @@ NMS_AUTH_SECRET=change-this-to-a-long-random-secret
         "NMS_PORT" = "$Port"
         "NMS_DATABASE_PATH" = "$InstallDir\data\nms.sqlite"
         "NMS_FRONTEND_DIST" = "$InstallDir\frontend\dist"
-        "NMS_ALLOWED_ORIGINS" = "http://localhost:$Port,http://127.0.0.1:$Port"
+        "NMS_ALLOWED_ORIGINS" = ($accessUrls -join ",")
     }
     foreach ($key in $managedValues.Keys) {
         $value = $managedValues[$key]
@@ -190,8 +226,17 @@ Register-ScheduledTask -TaskName $taskName -Action $action -Trigger @($startupTr
 
 if (-not $SkipFirewall) {
     $ruleName = "Vibe NMS $Port"
-    if (-not (Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue)) {
-        New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow | Out-Null
+    try {
+        Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+        New-NetFirewallRule `
+            -DisplayName $ruleName `
+            -Direction Inbound `
+            -Protocol TCP `
+            -LocalPort $Port `
+            -Action Allow `
+            -Profile Domain,Private,Public | Out-Null
+    } catch {
+        Write-Warning "Could not create Windows Firewall rule for port $Port. Other PCs may not connect until IT opens TCP $Port inbound. $($_.Exception.Message)"
     }
 }
 
@@ -201,10 +246,24 @@ $shortcutPath = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory"
 URL=http://localhost:$Port
 "@ | Set-Content -LiteralPath $shortcutPath -Encoding ASCII
 
+$networkUrlsPath = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) "Vibe NMS Network URLs.txt"
+@(
+    "Vibe NMS access URLs",
+    "",
+    "This PC:",
+    "http://localhost:$Port",
+    "",
+    "Other PCs on the company network:"
+) + ($accessUrls | Where-Object { $_ -notlike "http://localhost:*" }) | Set-Content -LiteralPath $networkUrlsPath -Encoding UTF8
+
 Start-ScheduledTask -TaskName $taskName
 Wait-ForDashboard -Port $Port
 
 Write-Host ""
 Write-Host "Vibe NMS installed."
-Write-Host "Open: http://localhost:$Port"
+Write-Host "Open on this PC: http://localhost:$Port"
+Write-Host "Open from other company PCs:"
+foreach ($url in $accessUrls | Where-Object { $_ -notlike "http://localhost:*" }) {
+    Write-Host "  $url"
+}
 Write-Host "Default login: admin / admin"

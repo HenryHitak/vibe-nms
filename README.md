@@ -18,6 +18,8 @@ Open:
 http://localhost:8080
 ```
 
+Other company PCs must use the server PC's IPv4 address, for example `http://10.10.1.25:8080`. The installer prints the detected company-network URLs and writes them to the desktop file `Vibe NMS Network URLs.txt`.
+
 Default login:
 
 ```text
