@@ -89,7 +89,7 @@ export default function DeviceAdminPage() {
       const payload = {
         ...form,
         vlan: form.vlan === "" || form.vlan == null ? null : Number(form.vlan),
-        monitoring_enabled: Boolean(form.monitoring_enabled)
+        monitoring_enabled: true
       };
       if (editing?.id) {
         await api(`/devices/${editing.id}`, { method: "PUT", body: JSON.stringify(payload) });
@@ -202,10 +202,6 @@ export default function DeviceAdminPage() {
                 {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((value) => <option key={value} value={value}>{value}</option>)}
               </select>
             </label>
-            <label className="inline-flex items-center gap-2 text-sm">
-              <input type="checkbox" name="monitoring_enabled" checked={Boolean(form.monitoring_enabled)} onChange={updateForm} />
-              Monitoring Enabled
-            </label>
             <label className="block text-sm">
               <span className="mb-1 block text-slate-600">Notes</span>
               <textarea className="min-h-20 w-full rounded-md border border-line bg-white px-3 py-2" name="notes" value={form.notes || ""} onChange={updateForm} />
@@ -219,4 +215,3 @@ export default function DeviceAdminPage() {
     </AdminLayout>
   );
 }
-

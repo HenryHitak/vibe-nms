@@ -30,6 +30,19 @@ After first login, go to `User Accounts` and create normal `USER` accounts for o
 
 `User Accounts` shows each user's last login time and last login IP. `Audit Logs` shows the source IP for every login, CRUD change, import, export, alert action, and settings change.
 
+## Monitoring Behavior
+
+The backend collector continuously monitors every registered active device IP.
+
+```text
+Included: every network_devices row where is_deleted = 0 and ip_address is not empty
+Excluded: soft-deleted devices only
+```
+
+Do not rely on the browser for ping checks. The browser only displays data. The backend collector performs network checks inside the corporate network and writes every check into `device_metrics`.
+
+If a single registered IP drops, the collector creates an ACTIVE warning alert after the first failed check, and the dashboard banner shows it on the next refresh. If multiple alerts happen in the same Plant, the banner rolls the message up to Plant-level impact.
+
 This package contains:
 
 - FastAPI backend with MS SQL Server storage for deployment and SQLite fallback for local development

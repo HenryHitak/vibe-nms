@@ -78,9 +78,6 @@ def status_from_probe(device: sqlite3.Row, probe: ProbeResult) -> tuple[str, int
     previous_failures = int(device["consecutive_failure_count"] or 0)
     criticality = (device["criticality"] or "MEDIUM").upper()
 
-    if not device["monitoring_enabled"]:
-        return "DISABLED", previous_failures
-
     if not probe.is_online:
         failures = previous_failures + 1
         if failures >= 5 and criticality in {"HIGH", "CRITICAL"}:
@@ -177,7 +174,7 @@ async def run_monitoring_cycle(conn: sqlite3.Connection | None = None) -> dict[s
 
     try:
         devices = conn.execute(
-            "SELECT * FROM network_devices WHERE is_deleted = 0 AND monitoring_enabled = 1 ORDER BY id"
+            "SELECT * FROM network_devices WHERE is_deleted = 0 AND ip_address IS NOT NULL AND ip_address != '' ORDER BY id"
         ).fetchall()
         for device in devices:
             counts["total"] += 1

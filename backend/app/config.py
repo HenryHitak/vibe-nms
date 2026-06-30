@@ -30,7 +30,7 @@ class Settings:
     allowed_origins = _csv(os.getenv("NMS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5177"))
     trusted_proxy_ips = set(_csv(os.getenv("NMS_TRUSTED_PROXY_IPS", "")))
     corporate_networks = _csv(os.getenv("NMS_CORPORATE_NETWORKS", "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"))
-    collector_enabled = _bool(os.getenv("NMS_COLLECTOR_ENABLED"), False)
+    collector_enabled = _bool(os.getenv("NMS_COLLECTOR_ENABLED"), True)
     collector_interval_seconds = int(os.getenv("NMS_COLLECTOR_INTERVAL_SECONDS", "30"))
     collector_timeout_ms = int(os.getenv("NMS_COLLECTOR_TIMEOUT_MS", "1000"))
     warning_latency_ms = float(os.getenv("NMS_WARNING_LATENCY_MS", "150"))

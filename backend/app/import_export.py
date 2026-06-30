@@ -310,7 +310,7 @@ def commit_import_job(conn: sqlite3.Connection, import_job_id: int, actor: Actor
         row_data = json.loads(import_row["row_data_json"])
         try:
             device = {column: row_data.get(column) for column in DEVICE_COLUMNS}
-            device["monitoring_enabled"] = 1 if device.get("monitoring_enabled") else 0
+            device["monitoring_enabled"] = 1
             existing = conn.execute(
                 "SELECT * FROM network_devices WHERE ip_address = ?",
                 (device["ip_address"],),
