@@ -20,6 +20,7 @@ class Settings:
     app_name = os.getenv("NMS_APP_NAME", "Vibe NMS")
     database_engine = os.getenv("NMS_DATABASE_ENGINE", "sqlite").strip().lower()
     database_path = Path(os.getenv("NMS_DATABASE_PATH", "./data/nms.sqlite"))
+    frontend_dist_path = Path(os.getenv("NMS_FRONTEND_DIST", "./frontend/dist"))
     mssql_server = os.getenv("NMS_MSSQL_SERVER", "mssql")
     mssql_port = int(os.getenv("NMS_MSSQL_PORT", "1433"))
     mssql_database = os.getenv("NMS_MSSQL_DATABASE", "vibe_nms")

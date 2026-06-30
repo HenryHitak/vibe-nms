@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 from .ap_client_discovery_worker import AP_CLIENT_ALERT_TYPES, ap_client_discovery_loop, run_ap_client_discovery_cycle
 from .audit import changed_fields, write_audit_log
@@ -1149,3 +1150,7 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(_request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
+if settings.frontend_dist_path.exists():
+    app.mount("/", StaticFiles(directory=settings.frontend_dist_path, html=True), name="frontend")

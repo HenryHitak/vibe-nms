@@ -12,3 +12,8 @@ __pycache__/
 *.sqlite-wal
 vibe-nms-release/
 vibe-nms-release.zip
+vibe-nms-windows-installer/
+vibe-nms-windows-installer.zip
+backend/build/
+backend/dist/
+backend/*.spec

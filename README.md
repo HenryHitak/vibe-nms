@@ -80,6 +80,43 @@ Use read-only controller/API tokens whenever possible. These tokens are never re
 
 Open `AP Clients` to see each AP's status, connected client count, known/unknown counts, connected IP list, MAC, hostname, SSID, VLAN, RSSI, last seen time, and status. Admins can manually run discovery from that page; manual runs are written to `Audit Logs` with username and source IP.
 
+## Windows Installer Without Docker
+
+You can run Vibe NMS without Docker on a Windows PC or Windows Server.
+
+Build the installer package from this repo:
+
+```powershell
+.\build_windows_installer.ps1
+```
+
+This creates:
+
+```text
+vibe-nms-windows-installer.zip
+```
+
+On the target PC, extract the zip and run PowerShell as Administrator:
+
+```powershell
+.\installer\install.ps1
+```
+
+Open:
+
+```text
+http://localhost:8080
+```
+
+Default login:
+
+```text
+ID: admin
+Password: admin
+```
+
+The installer registers a Windows Scheduled Task named `VibeNMS` so ping monitoring and AP Client Discovery keep running in the background. Docker and Node.js are not required on the target PC. For production, install it on a PC or server that stays powered on inside the corporate network.
+
 This package contains:
 
 - FastAPI backend with MS SQL Server storage for deployment and SQLite fallback for local development
@@ -93,6 +130,7 @@ This package contains:
 - Admin user account creation, disable, and password reset
 - React dashboard/admin UI with green, orange, red, and gray device states
 - Docker Compose packaging for internal server deployment
+- Windows installer package build script for non-Docker deployment
 
 ## Local Development
 
