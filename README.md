@@ -2,6 +2,16 @@
 
 Internal Network Monitoring Software for plant networks.
 
+## Documentation
+
+- [Operations documentation](docs/README.md)
+- [Workflow diagrams](docs/workflow-diagrams.md)
+- [Operation and usage guide](docs/operation-and-usage.md)
+- [Device, IP, AP, Switch, Cisco Controller model](docs/easy-device-network-model.md)
+- [Backend workflow](docs/backend-workflow.md)
+- [Monitoring workflow](docs/monitoring-workflow.md)
+- [Dashboard API workflow](docs/dashboard-api-workflow.md)
+
 ## Download and Run from GitHub
 
 On the company PC or internal server:
