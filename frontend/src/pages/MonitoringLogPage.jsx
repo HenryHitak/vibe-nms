@@ -50,6 +50,8 @@ export default function MonitoringLogPage() {
   const [payload, setPayload] = useState({ logs: [], runs: [], thresholds: {} });
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [runResult, setRunResult] = useState(null);
+  const [running, setRunning] = useState(false);
 
   async function load() {
     try {
@@ -62,11 +64,15 @@ export default function MonitoringLogPage() {
   }
 
   async function runOnce() {
+    setRunning(true);
     try {
-      await api("/monitoring/run-once", { method: "POST" });
+      const result = await api("/monitoring/run-once", { method: "POST" });
+      setRunResult(result);
       await load();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setRunning(false);
     }
   }
 
@@ -83,14 +89,34 @@ export default function MonitoringLogPage() {
             <option value="">All Status</option>
             {["ONLINE", "WARNING", "UNCERTAIN", "FLAPPING", "OFFLINE", "CRITICAL", "UNKNOWN"].map((value) => <option key={value} value={value}>{value}</option>)}
           </select>
-          <button className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-3 text-sm font-semibold text-white" onClick={runOnce}>
-            <Play size={16} /> Run
+          <button className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-3 text-sm font-semibold text-white disabled:opacity-50" disabled={running} onClick={runOnce}>
+            <Play size={16} /> {running ? "Checking" : "Run Ping Check Now"}
           </button>
         </>
       }
     >
       <div className="flex h-full min-h-0 flex-col">
         {error ? <div className="mb-4 shrink-0 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
+        <div className="mb-4 shrink-0 rounded-md border border-line bg-white p-4 text-sm text-slate-700 shadow-sm">
+          <div className="font-semibold text-ink">What this page does</div>
+          <div className="mt-1">The backend checks every registered device IP from inside the company network. `Run Ping Check Now` starts one manual check cycle immediately; the table shows each ping/TCP fallback result and why the status was chosen.</div>
+        </div>
+        {runResult ? (
+          <div className="mb-4 grid shrink-0 grid-cols-2 gap-3 md:grid-cols-5">
+            {[
+              ["Checked", runResult.total],
+              ["Online", runResult.online],
+              ["Warning", runResult.warning],
+              ["Offline", runResult.offline],
+              ["Errors", runResult.error]
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-md border border-line bg-white p-3 shadow-sm">
+                <div className="text-xs font-semibold uppercase text-slate-500">{label}</div>
+                <div className="mt-1 text-xl font-semibold tabular-nums text-ink">{value ?? 0}</div>
+              </div>
+            ))}
+          </div>
+        ) : null}
         <div className="mb-4 grid shrink-0 grid-cols-1 gap-3 xl:grid-cols-4">
           {payload.runs.slice(0, 4).map((run) => (
             <div key={run.id} className="rounded-md border border-line bg-white p-4">

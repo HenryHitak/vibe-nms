@@ -71,6 +71,7 @@ export default function APClientDiscoveryPage({ role }) {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
+  const [runResult, setRunResult] = useState(null);
   const [error, setError] = useState("");
 
   async function loadAps() {
@@ -126,7 +127,8 @@ export default function APClientDiscoveryPage({ role }) {
   async function runDiscovery() {
     setRunning(true);
     try {
-      await api("/discovery/ap-clients/run", { method: "POST" });
+      const result = await api("/discovery/ap-clients/run", { method: "POST" });
+      setRunResult(result);
       await loadAps();
       await loadSelected(selectedId);
     } catch (err) {
@@ -244,7 +246,7 @@ export default function APClientDiscoveryPage({ role }) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-ink">AP Client Discovery</h1>
-          <div className="text-sm text-slate-500">Wireless clients discovered by backend collectors inside the corporate network.</div>
+          <div className="text-sm text-slate-500">The backend queries registered APs or controllers and stores wireless clients. The browser does not scan Wi-Fi.</div>
         </div>
         <div className="flex gap-2">
           <button className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold text-slate-700" onClick={() => { loadAps(); loadSelected(selectedId); }}>
@@ -252,11 +254,43 @@ export default function APClientDiscoveryPage({ role }) {
           </button>
           {role === "ADMIN" ? (
             <button className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-3 text-sm font-semibold text-white" onClick={runDiscovery} disabled={running}>
-              <Wifi size={16} /> {running ? "Running" : "Run Discovery"}
+              <Wifi size={16} /> {running ? "Discovering" : "Discover AP Clients Now"}
             </button>
           ) : null}
         </div>
       </div>
+
+      <div className="mb-4 rounded-md border border-line bg-white p-4 text-sm text-slate-700 shadow-sm">
+        <div className="font-semibold text-ink">How this works</div>
+        <div className="mt-1">First register Access Points in `Device Master` with `Device Type = AP`. `Discover AP Clients Now` runs the backend AP client collector once, then the `Known Client CRUD` section lets ADMIN users add, edit, or delete expected wireless devices for the selected AP.</div>
+      </div>
+
+      {runResult ? (
+        <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-5">
+          {[
+            ["APs Queried", runResult.total_aps],
+            ["Clients Found", runResult.total_clients],
+            ["Known", runResult.known],
+            ["Unknown", runResult.unknown],
+            ["Issues", runResult.issues]
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-md border border-line bg-white p-3 shadow-sm">
+              <div className="text-xs font-semibold uppercase text-slate-500">{label}</div>
+              <div className="mt-1 text-xl font-semibold tabular-nums text-ink">{value ?? 0}</div>
+            </div>
+          ))}
+          {runResult.total_aps === 0 ? (
+            <div className="col-span-full rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              No AP was queried. Add AP devices in `Device Master` first, set `Device Type` to `AP`, and keep monitoring enabled.
+            </div>
+          ) : null}
+          {runResult.total_aps > 0 && runResult.total_clients === 0 ? (
+            <div className="col-span-full rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              Discovery ran, but no clients were returned. Check the AP provider/controller settings or use the demo provider for local testing.
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[330px_1fr]">
         <aside className="min-h-0 overflow-auto rounded-md border border-line bg-white p-3 shadow-sm">
@@ -289,7 +323,12 @@ export default function APClientDiscoveryPage({ role }) {
                 </button>
               );
             })}
-            {!aps.length ? <div className="py-8 text-center text-sm text-slate-500">No AP devices registered</div> : null}
+            {!aps.length ? (
+              <div className="rounded-md border border-dashed border-line bg-slate-50 p-4 text-sm text-slate-600">
+                <div className="font-semibold text-ink">No AP devices registered</div>
+                <div className="mt-1">Go to `Device Master`, add an Access Point, and set `Device Type` to `AP`. AP client CRUD appears after an AP is selected.</div>
+              </div>
+            ) : null}
           </div>
         </aside>
 
@@ -345,8 +384,8 @@ export default function APClientDiscoveryPage({ role }) {
               <section className="rounded-md border border-line bg-white p-4 shadow-sm">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="font-semibold">Registered AP Clients</h2>
-                    <div className="text-sm text-slate-500">Known wireless devices expected on this AP.</div>
+                    <h2 className="font-semibold">Known Client CRUD</h2>
+                    <div className="text-sm text-slate-500">Create, edit, or delete expected wireless devices for this selected AP.</div>
                   </div>
                   <span className="text-sm text-slate-500">{registeredClients.length} registered</span>
                 </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, BellOff, Check, RotateCcw, X } from "lucide-react";
+import { Bell, BellOff, CheckCheck, CircleCheckBig, X } from "lucide-react";
 import { api } from "../api.js";
 import AdminLayout from "../components/AdminLayout.jsx";
 import { formatTijuanaDateTime } from "../time.js";
@@ -127,6 +127,11 @@ export default function AlertCenter({ role = "USER" }) {
     >
       {error ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
 
+      <div className="mb-4 rounded-md border border-line bg-white p-4 text-sm text-slate-700 shadow-sm">
+        <div className="font-semibold text-ink">Alert handling guide</div>
+        <div className="mt-1">`Mark Reviewed` means an ADMIN has checked the alert but the issue is still open. `Close Alert` resolves that alert. `Mute` stops new dashboard notifications for that alert type, but does not disable alert creation.</div>
+      </div>
+
       <div className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.75fr)]">
         <section className="min-w-0 border border-line bg-white">
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
@@ -164,22 +169,22 @@ export default function AlertCenter({ role = "USER" }) {
                         <div className="inline-flex flex-wrap justify-end gap-2">
                           {alert.status === "ACTIVE" ? (
                             <button
-                              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                              title="Mark reviewed but keep the alert open"
-                              onClick={() => handleAlert(alert.id, "acknowledge")}
-                            >
-                              <Check size={14} /> Acknowledge
-                            </button>
-                          ) : null}
-                          {alert.status !== "RESOLVED" ? (
-                            <button
-                              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                              title="Close this alert"
-                              onClick={() => handleAlert(alert.id, "resolve")}
-                            >
-                              <RotateCcw size={14} /> Resolve
-                            </button>
-                          ) : (
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            title="Mark reviewed but keep the alert open"
+                            onClick={() => handleAlert(alert.id, "acknowledge")}
+                          >
+                            <CheckCheck size={14} /> Mark Reviewed
+                          </button>
+                        ) : null}
+                        {alert.status !== "RESOLVED" ? (
+                          <button
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            title="Close this alert"
+                            onClick={() => handleAlert(alert.id, "resolve")}
+                          >
+                            <CircleCheckBig size={14} /> Close Alert
+                          </button>
+                        ) : (
                             <span className="inline-flex h-8 items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 text-xs font-semibold text-emerald-800">Closed</span>
                           )}
                           {muteButton(alert.alert_type)}
