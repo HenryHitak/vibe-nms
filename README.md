@@ -120,6 +120,8 @@ It includes:
 - Per-minute and hourly graph buckets
 - Latest interface traffic table with Device, IP, AP, Switch, interface, source, and last collected time
 
+The top KPI area shows `Current RX`, `RX Min`, `RX Avg`, `RX Max`, `Current TX`, `TX Min`, `TX Avg`, and `TX Max` as separate cards for the selected date range.
+
 The browser does not collect traffic directly. The backend traffic collector writes snapshots to `network_traffic_metrics`, and the UI reads them from:
 
 ```text

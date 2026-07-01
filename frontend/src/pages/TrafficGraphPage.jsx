@@ -361,10 +361,14 @@ export default function TrafficGraphPage() {
         ) : null}
 
         <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <KpiCard label="Latest RX" value={formatBps(summary.current_rx_bps)} sublabel={`${summary.device_count || 0} devices / ${NMS_TIME_ZONE_LABEL}`} />
-          <KpiCard label="Latest TX" value={formatBps(summary.current_tx_bps)} sublabel={sourceText || "No source"} />
-          <KpiCard label="Range RX Peak" value={formatBps(rxMax || summary.range_max_rx_bps)} sublabel={`Min ${formatBps(rxMin)} / Avg ${formatBps(rxAvg || summary.range_avg_rx_bps)}`} />
-          <KpiCard label="Range TX Peak" value={formatBps(txMax || summary.range_max_tx_bps)} sublabel={`Min ${formatBps(txMin)} / Avg ${formatBps(txAvg || summary.range_avg_tx_bps)}`} />
+          <KpiCard label="Current RX" value={formatBps(summary.current_rx_bps)} sublabel={`${summary.device_count || 0} devices / ${NMS_TIME_ZONE_LABEL}`} />
+          <KpiCard label="RX Min" value={formatBps(rxMin)} sublabel="Selected range" />
+          <KpiCard label="RX Avg" value={formatBps(rxAvg || summary.range_avg_rx_bps)} sublabel="Selected range" />
+          <KpiCard label="RX Max" value={formatBps(rxMax || summary.range_max_rx_bps)} sublabel="Selected range" />
+          <KpiCard label="Current TX" value={formatBps(summary.current_tx_bps)} sublabel={sourceText || "No source"} />
+          <KpiCard label="TX Min" value={formatBps(txMin)} sublabel="Selected range" />
+          <KpiCard label="TX Avg" value={formatBps(txAvg || summary.range_avg_tx_bps)} sublabel="Selected range" />
+          <KpiCard label="TX Max" value={formatBps(txMax || summary.range_max_tx_bps)} sublabel="Selected range" />
         </div>
 
         {!latest.length ? (
