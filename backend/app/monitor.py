@@ -7,6 +7,7 @@ import sqlite3
 import time
 from dataclasses import dataclass
 
+from .alert_settings import network_alert_enabled
 from .config import settings
 from .db import connect, row_to_dict
 from .validation import ip_in_allowed_networks
@@ -212,9 +213,21 @@ def upsert_alert_for_status(
         alert_type = "PACKET_LOSS"
     elif probe.is_online and probe.latency_ms and probe.latency_ms >= settings.warning_latency_ms:
         alert_type = "LATENCY"
+    elif status == "FLAPPING":
+        alert_type = "FLAPPING"
     else:
         alert_type = status
     message = f"{device['device_name']} ({device['ip_address']}) status is {status}. {reason}"
+    if not network_alert_enabled(conn, alert_type):
+        conn.execute(
+            """
+            UPDATE alerts
+            SET status = 'RESOLVED', resolved_at = CURRENT_TIMESTAMP, last_detected_at = CURRENT_TIMESTAMP
+            WHERE device_id = ? AND alert_type = ? AND status IN ('ACTIVE', 'ACKNOWLEDGED')
+            """,
+            (device["id"], alert_type),
+        )
+        return
     existing = conn.execute(
         """
         SELECT * FROM alerts

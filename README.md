@@ -42,6 +42,12 @@ After first login, go to `User Accounts` and create normal `USER` accounts for o
 
 `User Accounts` shows each user's last login time and last login IP. `Audit Logs` shows the source IP for every login, CRUD change, import, export, alert action, and settings change.
 
+Excel device import/export is managed from `Device Master`:
+
+- `Template`: download the device import template.
+- `Excel Import`: upload and preview a device workbook, then commit valid rows.
+- `Excel Export`: download the current device list as `devices.xlsx`.
+
 ## Monitoring Behavior
 
 The backend collector continuously monitors every registered active device IP.
@@ -54,6 +60,8 @@ Excluded: soft-deleted devices only
 Do not rely on the browser for ping checks. The browser only displays data. The backend collector performs network checks inside the corporate network and writes every check into `device_metrics`.
 
 If a single registered IP drops, the collector creates an ACTIVE warning alert after the first failed check, and the dashboard banner shows it on the next refresh. If multiple alerts happen in the same Plant, the banner rolls the message up to Plant-level impact.
+
+ADMIN users can open `Settings > Alarm Settings` to turn alert creation on or off by type. Disabling an alarm type stops new alerts and resolves active alerts for that type on the next collector cycle.
 
 ## Main Dashboard Layout
 
@@ -559,7 +567,7 @@ Every export writes an audit log with username and source IP.
 
 ## Restore and Import
 
-Use the Excel import screen:
+Use `Device Master > Excel Import`:
 
 ```text
 1. Download devices-template.xlsx

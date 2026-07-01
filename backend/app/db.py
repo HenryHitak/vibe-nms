@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable
 
+from .alert_settings import ALERT_SETTING_DEFAULTS
 from .auth import hash_password
 from .config import settings
 
@@ -603,6 +604,7 @@ def seed_reference_data(conn: sqlite3.Connection) -> None:
         "warning_packet_loss_percent": str(settings.warning_packet_loss_percent),
         "tcp_fallback_ports": ",".join(str(port) for port in settings.tcp_fallback_ports),
         "corporate_networks": ",".join(settings.corporate_networks),
+        **ALERT_SETTING_DEFAULTS,
     }
     for key, value in default_settings.items():
         exists = conn.execute("SELECT COUNT(*) FROM system_settings WHERE key = ?", (key,)).fetchone()[0]

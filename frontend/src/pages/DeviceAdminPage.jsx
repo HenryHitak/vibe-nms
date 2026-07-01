@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { Pencil, Plus, RotateCcw, Save, Trash2, X } from "lucide-react";
-import { api } from "../api.js";
+import { useEffect, useRef, useState } from "react";
+import { Download, FileDown, FileUp, Pencil, Plus, RotateCcw, Save, Trash2, X } from "lucide-react";
+import { api, downloadFile } from "../api.js";
 import AdminLayout from "../components/AdminLayout.jsx";
 import DeviceTable from "../components/DeviceTable.jsx";
 
@@ -52,6 +52,10 @@ export default function DeviceAdminPage() {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_DEVICE);
+  const [importJob, setImportJob] = useState(null);
+  const [commitResult, setCommitResult] = useState(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const fileInputRef = useRef(null);
   const [error, setError] = useState("");
 
   async function load() {
@@ -124,6 +128,56 @@ export default function DeviceAdminPage() {
     }
   }
 
+  async function previewImport(file) {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      setImportBusy(true);
+      setImportJob(await api("/import/devices/preview", { method: "POST", body: formData }));
+      setCommitResult(null);
+      setError("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setImportBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function commitImport() {
+    if (!importJob?.id) return;
+    try {
+      setImportBusy(true);
+      const result = await api("/import/devices/commit", { method: "POST", body: JSON.stringify({ import_job_id: importJob.id }) });
+      setCommitResult(result);
+      await load();
+      setError("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
+  async function exportDevices() {
+    try {
+      await downloadFile("/export/devices.xlsx", "devices.xlsx");
+      setError("");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function downloadTemplate() {
+    try {
+      await downloadFile("/import/template/devices.xlsx", "devices-template.xlsx");
+      setError("");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <AdminLayout
       title="Device Master"
@@ -134,6 +188,22 @@ export default function DeviceAdminPage() {
             <input type="checkbox" checked={includeDeleted} onChange={(event) => setIncludeDeleted(event.target.checked)} />
             Deleted
           </label>
+          <button className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold" onClick={downloadTemplate}>
+            <Download size={16} /> Template
+          </button>
+          <input
+            ref={fileInputRef}
+            className="hidden"
+            type="file"
+            accept=".xlsx"
+            onChange={(event) => previewImport(event.target.files?.[0])}
+          />
+          <button className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold disabled:opacity-50" disabled={importBusy} onClick={() => fileInputRef.current?.click()}>
+            <FileUp size={16} /> Excel Import
+          </button>
+          <button className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold" onClick={exportDevices}>
+            <FileDown size={16} /> Excel Export
+          </button>
           <button className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-3 text-sm font-semibold text-white" onClick={startCreate}>
             <Plus size={16} /> Add
           </button>
@@ -141,6 +211,67 @@ export default function DeviceAdminPage() {
       }
     >
       {error ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
+      {importJob ? (
+        <section className="mb-4 rounded-md border border-line bg-white p-4 shadow-sm">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Excel Import Preview</h2>
+              <div className="text-sm text-slate-500">Job {importJob.id} / {importJob.total_rows} rows</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="h-9 rounded-md border border-line bg-white px-3 text-sm font-semibold" onClick={() => { setImportJob(null); setCommitResult(null); }}>
+                Close
+              </button>
+              <button className="h-9 rounded-md bg-ink px-3 text-sm font-semibold text-white disabled:opacity-50" disabled={importBusy || importJob.error_rows > 0 || commitResult} onClick={commitImport}>
+                Commit Import
+              </button>
+            </div>
+          </div>
+          <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-5">
+            {[
+              ["Rows", importJob.total_rows],
+              ["Valid", importJob.valid_rows],
+              ["Warnings", importJob.warning_rows],
+              ["Errors", importJob.error_rows],
+              ["Job", importJob.id]
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-md border border-line bg-slate-50 p-3">
+                <div className="text-xs font-semibold uppercase text-slate-500">{label}</div>
+                <div className="text-xl font-semibold tabular-nums text-ink">{value}</div>
+              </div>
+            ))}
+          </div>
+          {commitResult ? (
+            <div className="mb-3 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-900">
+              Inserted {commitResult.inserted_rows}, updated {commitResult.updated_rows}, failed {commitResult.failed_rows}
+            </div>
+          ) : null}
+          <div className="table-scroll max-h-72 overflow-auto border border-line">
+            <table className="min-w-full text-left text-sm">
+              <thead className="sticky top-0 bg-slate-100 text-xs uppercase text-slate-600">
+                <tr>
+                  <th className="px-3 py-2">Row</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Device</th>
+                  <th className="px-3 py-2">IP</th>
+                  <th className="px-3 py-2">Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(importJob.rows || []).map((row) => (
+                  <tr key={row.row_number} className="border-t border-line">
+                    <td className="px-3 py-2 tabular-nums">{row.row_number}</td>
+                    <td className="px-3 py-2">{row.validation_status}</td>
+                    <td className="px-3 py-2 font-semibold">{row.row_data.device_name || "-"}</td>
+                    <td className="px-3 py-2 tabular-nums">{row.row_data.ip_address || "-"}</td>
+                    <td className="px-3 py-2">{row.validation_message || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
       <div className="grid h-full min-h-[650px] grid-cols-1 gap-4 xl:grid-cols-[1fr_440px]">
         <DeviceTable
           devices={devices}

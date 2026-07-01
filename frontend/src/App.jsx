@@ -3,8 +3,6 @@ import {
   Activity,
   BellRing,
   Database,
-  FileDown,
-  FileUp,
   Gauge,
   History,
   ListChecks,
@@ -30,8 +28,6 @@ import DatabaseConfigPage from "./pages/DatabaseConfigPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import DeviceAdminPage from "./pages/DeviceAdminPage.jsx";
 import DisplayDashboardPage from "./pages/DisplayDashboardPage.jsx";
-import ExcelExportPage from "./pages/ExcelExportPage.jsx";
-import ExcelImportPage from "./pages/ExcelImportPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import MonitoringLogPage from "./pages/MonitoringLogPage.jsx";
 import SystemSettingsPage from "./pages/SystemSettingsPage.jsx";
@@ -41,8 +37,6 @@ import UserAdminPage from "./pages/UserAdminPage.jsx";
 const ADMIN_ROUTES = [
   { key: "users", label: "User Accounts", icon: UserRound, page: UserAdminPage },
   { key: "devices", label: "Device Master", icon: Server, page: DeviceAdminPage },
-  { key: "import", label: "Excel Import", icon: FileUp, page: ExcelImportPage },
-  { key: "export", label: "Excel Export", icon: FileDown, page: ExcelExportPage },
   { key: "audit", label: "Audit Logs", icon: History, page: AuditLogPage },
   { key: "monitoring", label: "Monitoring Logs", icon: ListChecks, page: MonitoringLogPage },
   { key: "database", label: "DB Config", icon: Database, page: DatabaseConfigPage },
@@ -82,10 +76,14 @@ function AuthenticatedApp() {
   const ActivePage = (routes.find((item) => item.key === route) || routes[0]).page;
 
   useEffect(() => {
+    if (!routes.some((item) => item.key === route)) {
+      setRoute("dashboard");
+      return;
+    }
     if (role !== "ADMIN" && ADMIN_ROUTES.some((item) => item.key === route)) {
       setRoute("dashboard");
     }
-  }, [role, route]);
+  }, [role, route, routes]);
 
   useEffect(() => {
     function handleHashChange() {

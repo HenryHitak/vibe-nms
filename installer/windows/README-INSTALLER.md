@@ -51,6 +51,16 @@ Default SQLite DB: C:\Program Files\Vibe NMS\data\nms.sqlite
 
 Admins can open `Backend Info` in the app to see where the backend and SQL database are running.
 
+Device Excel import/export is inside `Device Master`:
+
+```text
+Device Master > Template
+Device Master > Excel Import
+Device Master > Excel Export
+```
+
+Alarm controls are inside `Settings > Alarm Settings`. Turning an alarm type off stops new alerts for that type and resolves active alerts for that type during the next collector cycle.
+
 ## Configure
 
 Edit:

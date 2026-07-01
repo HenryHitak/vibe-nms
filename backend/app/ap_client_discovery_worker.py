@@ -5,6 +5,7 @@ import time
 from collections import Counter
 from typing import Any
 
+from .alert_settings import ap_alert_enabled
 from .ap_client_providers import APClientObservation, normalize_mac, provider_for_ap, utc_now_iso
 from .config import settings
 from .db import connect, row_to_dict, rows_to_dicts
@@ -100,6 +101,9 @@ def _resolve_ip_by_mac(mac_address: str | None, devices_by_mac: dict[str, dict[s
 
 
 def _upsert_alert(conn: Any, device_id: int, alert_type: str, severity: str, message: str) -> None:
+    if not ap_alert_enabled(conn, alert_type):
+        _resolve_alert(conn, device_id, alert_type)
+        return
     existing = conn.execute(
         """
         SELECT * FROM alerts
