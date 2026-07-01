@@ -145,6 +145,37 @@ NMS_TRAFFIC_DEFAULT_PROVIDER=demo
 
 날짜 range는 Mexico/Tijuana 기준으로 선택합니다. 짧은 구간은 `Per minute`, 하루 이상 구간은 `Per hour`로 보면 그래프를 한눈에 보기 쉽습니다.
 
+실제 데이터를 바로 넣어서 시험할 때는 ADMIN token으로 아래 API를 호출합니다.
+
+```text
+POST /api/traffic/observations
+```
+
+```json
+{
+  "observations": [
+    {
+      "ip_address": "105.102.8.106",
+      "interface_name": "Gi1/0/4",
+      "rx_bps": 12500000,
+      "tx_bps": 4200000,
+      "source": "cisco-controller"
+    }
+  ]
+}
+```
+
+Traffic Graphs 화면의 `Traffic Source`에서 provider를 `generic-api`로 바꾸면 backend가 내부 collector API에서 값을 가져옵니다. 이때 API token은 backend `.env`에 저장되고 화면에는 다시 표시되지 않습니다.
+
+실제 운영 시작 순서:
+
+1. Vibe NMS는 사내망 안의 PC 또는 서버에 설치합니다.
+2. `Device Master`에서 실제 장치를 등록하거나 Excel로 import합니다.
+3. 모니터링할 장치는 `Monitoring Enabled`를 켭니다.
+4. 장치 ONLINE/WARNING/OFFLINE 상태는 backend ping worker가 계속 갱신합니다.
+5. Traffic Graphs는 ping 결과가 아니라 `network_traffic_metrics` 데이터입니다. 실제 RX/TX를 보려면 `Traffic Source`를 연결하거나 `/api/traffic/observations`로 실제 observation을 넣어야 합니다.
+6. Production installer는 새 DB에 샘플 장비를 넣지 않도록 `NMS_SEED_SAMPLE_DATA=false`로 설정합니다.
+
 ## 8. 로그 확인
 
 `Monitoring Logs`:

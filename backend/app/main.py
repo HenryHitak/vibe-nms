@@ -47,6 +47,8 @@ from .schemas import (
     ImportCommitRequest,
     LoginRequest,
     PasswordResetPayload,
+    TrafficConfigPayload,
+    TrafficObservationIngestRequest,
     UserCreatePayload,
     UserUpdatePayload,
 )
@@ -266,6 +268,17 @@ DATABASE_CONFIG_KEYS = [
     "NMS_MSSQL_TRUST_SERVER_CERTIFICATE",
 ]
 
+TRAFFIC_CONFIG_KEYS = [
+    "NMS_TRAFFIC_COLLECTION_ENABLED",
+    "NMS_TRAFFIC_COLLECTION_INTERVAL_SECONDS",
+    "NMS_TRAFFIC_DEFAULT_PROVIDER",
+    "NMS_TRAFFIC_GENERIC_API_URL",
+    "NMS_TRAFFIC_GENERIC_API_TOKEN",
+    "NMS_CISCO_WLC_CONTROLLER_URL",
+    "NMS_CISCO_WLC_API_TOKEN",
+    "NMS_GENERIC_SNMP_COMMUNITY",
+]
+
 
 def _database_env_path() -> Path:
     explicit = os.getenv("NMS_ENV_PATH")
@@ -415,6 +428,79 @@ def _database_env_updates(data: dict[str, Any], payload: DatabaseConfigPayload) 
     if payload.mssql_password:
         updates["NMS_MSSQL_PASSWORD"] = payload.mssql_password
     return updates
+
+
+def _traffic_config_from_values(env_values: dict[str, str] | None = None) -> dict[str, Any]:
+    values = env_values or {}
+    return {
+        "traffic_collection_enabled": str(values.get("NMS_TRAFFIC_COLLECTION_ENABLED", _bool_text(settings.traffic_collection_enabled))).lower() in {"1", "true", "yes", "on"},
+        "traffic_collection_interval_seconds": int(values.get("NMS_TRAFFIC_COLLECTION_INTERVAL_SECONDS", settings.traffic_collection_interval_seconds) or 60),
+        "traffic_default_provider": values.get("NMS_TRAFFIC_DEFAULT_PROVIDER", settings.traffic_default_provider),
+        "traffic_generic_api_url": values.get("NMS_TRAFFIC_GENERIC_API_URL", settings.traffic_generic_api_url),
+        "traffic_generic_api_token_configured": bool(values.get("NMS_TRAFFIC_GENERIC_API_TOKEN") or settings.traffic_generic_api_token),
+        "cisco_wlc_controller_url": values.get("NMS_CISCO_WLC_CONTROLLER_URL", settings.cisco_wlc_controller_url),
+        "cisco_wlc_api_token_configured": bool(values.get("NMS_CISCO_WLC_API_TOKEN") or settings.cisco_wlc_api_token),
+        "generic_snmp_community_configured": bool(values.get("NMS_GENERIC_SNMP_COMMUNITY") or settings.generic_snmp_community),
+    }
+
+
+def _normalized_traffic_payload(payload: TrafficConfigPayload, env_values: dict[str, str] | None = None) -> dict[str, Any]:
+    data = payload.model_dump()
+    values = env_values or {}
+    provider = str(data.get("traffic_default_provider") or "demo").strip().lower().replace("_", "-")
+    if provider not in {"demo", "generic-api", "cisco-wlc", "generic-snmp", "auto"}:
+        raise HTTPException(status_code=422, detail="Traffic provider must be demo, generic-api, cisco-wlc, generic-snmp, or auto")
+    data["traffic_default_provider"] = provider
+    data["traffic_collection_interval_seconds"] = min(max(int(data.get("traffic_collection_interval_seconds") or 60), 10), 3600)
+    for key in ("traffic_generic_api_url", "traffic_generic_api_token", "cisco_wlc_controller_url", "cisco_wlc_api_token", "generic_snmp_community"):
+        data[key] = str(data.get(key) or "").strip()
+    if provider == "generic-api" and not data["traffic_generic_api_url"]:
+        raise HTTPException(status_code=422, detail="Generic API URL is required")
+    if provider == "cisco-wlc" and not data["cisco_wlc_controller_url"]:
+        raise HTTPException(status_code=422, detail="Cisco WLC controller URL is required")
+    existing_snmp_community = values.get("NMS_GENERIC_SNMP_COMMUNITY") or settings.generic_snmp_community
+    if provider == "generic-snmp" and not data["generic_snmp_community"] and not existing_snmp_community:
+        raise HTTPException(status_code=422, detail="SNMP community is required")
+    return data
+
+
+def _traffic_env_updates(data: dict[str, Any], payload: TrafficConfigPayload) -> dict[str, str]:
+    updates = {
+        "NMS_TRAFFIC_COLLECTION_ENABLED": _bool_text(bool(data["traffic_collection_enabled"])),
+        "NMS_TRAFFIC_COLLECTION_INTERVAL_SECONDS": str(data["traffic_collection_interval_seconds"]),
+        "NMS_TRAFFIC_DEFAULT_PROVIDER": data["traffic_default_provider"],
+        "NMS_TRAFFIC_GENERIC_API_URL": data["traffic_generic_api_url"],
+        "NMS_CISCO_WLC_CONTROLLER_URL": data["cisco_wlc_controller_url"],
+    }
+    if payload.traffic_generic_api_token:
+        updates["NMS_TRAFFIC_GENERIC_API_TOKEN"] = payload.traffic_generic_api_token
+    if payload.cisco_wlc_api_token:
+        updates["NMS_CISCO_WLC_API_TOKEN"] = payload.cisco_wlc_api_token
+    if payload.generic_snmp_community:
+        updates["NMS_GENERIC_SNMP_COMMUNITY"] = payload.generic_snmp_community
+    return updates
+
+
+def _apply_traffic_runtime_config(data: dict[str, Any]) -> None:
+    settings.traffic_collection_enabled = bool(data["traffic_collection_enabled"])
+    settings.traffic_collection_interval_seconds = int(data["traffic_collection_interval_seconds"])
+    settings.traffic_default_provider = data["traffic_default_provider"]
+    settings.traffic_generic_api_url = data["traffic_generic_api_url"]
+    if data.get("traffic_generic_api_token"):
+        settings.traffic_generic_api_token = data["traffic_generic_api_token"]
+    settings.cisco_wlc_controller_url = data["cisco_wlc_controller_url"]
+    if data.get("cisco_wlc_api_token"):
+        settings.cisco_wlc_api_token = data["cisco_wlc_api_token"]
+    if data.get("generic_snmp_community"):
+        settings.generic_snmp_community = data["generic_snmp_community"]
+
+
+def _traffic_rollup(values: list[Any]) -> tuple[float | None, float | None, float | None]:
+    clean = [_number(value) for value in values]
+    numbers = [value for value in clean if value is not None]
+    if not numbers:
+        return None, None, None
+    return min(numbers), max(numbers), round(sum(numbers) / len(numbers), 2)
 
 
 def _device_filter_clauses(filters: dict[str, Any], alias: str = "d", include_deleted_clause: bool = True) -> tuple[list[str], list[Any]]:
@@ -1198,6 +1284,144 @@ def traffic_summary(
             )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="Invalid traffic date range") from exc
+
+
+@app.get("/api/traffic/config")
+def get_traffic_config(actor: Actor = Depends(get_actor)) -> dict[str, Any]:
+    require_admin(actor)
+    env_path = _database_env_path()
+    env_values = _read_env_values(env_path)
+    return {
+        "env_path": str(env_path),
+        "runtime": _traffic_config_from_values({}),
+        "pending": _traffic_config_from_values(env_values),
+        "providers": ["demo", "generic-api", "cisco-wlc", "generic-snmp", "auto"],
+        "token_fields": {
+            "traffic_generic_api_token": "stored in backend env only",
+            "cisco_wlc_api_token": "stored in backend env only",
+            "generic_snmp_community": "stored in backend env only",
+        },
+        "generic_api_contract": {
+            "method": "GET",
+            "path": "/devices/{device_identifier}/traffic",
+            "response_fields": ["rx_bps", "tx_bps", "interface_name", "utilization_percent"],
+        },
+    }
+
+
+@app.put("/api/traffic/config")
+def update_traffic_config(payload: TrafficConfigPayload, actor: Actor = Depends(get_actor)) -> dict[str, Any]:
+    require_admin(actor)
+    env_path = _database_env_path()
+    env_values = _read_env_values(env_path)
+    data = _normalized_traffic_payload(payload, env_values)
+    before = _traffic_config_from_values(env_values)
+    _write_env_values(env_path, _traffic_env_updates(data, payload))
+    _apply_traffic_runtime_config(data)
+    after = _traffic_config_from_values(_read_env_values(env_path))
+    with transaction() as conn:
+        write_audit_log(
+            conn,
+            actor,
+            "UPDATE",
+            "TRAFFIC_CONFIG",
+            before_data=before,
+            after_data=after,
+            changed=changed_fields(before, after),
+        )
+    return {
+        "saved": True,
+        "env_path": str(env_path),
+        "runtime": _traffic_config_from_values({}),
+        "pending": after,
+        "message": "Traffic config saved and applied to the running backend.",
+    }
+
+
+@app.post("/api/traffic/observations")
+def ingest_traffic_observations(payload: TrafficObservationIngestRequest, actor: Actor = Depends(get_actor)) -> dict[str, Any]:
+    require_admin(actor)
+    inserted = 0
+    skipped = 0
+    errors: list[dict[str, Any]] = []
+    with transaction() as conn:
+        for index, observation in enumerate(payload.observations):
+            data = observation.model_dump()
+            if data.get("rx_bps") is None and data.get("tx_bps") is None:
+                skipped += 1
+                errors.append({"index": index, "error": "rx_bps or tx_bps is required"})
+                continue
+            device = None
+            if data.get("device_id"):
+                device = conn.execute("SELECT * FROM network_devices WHERE id = ? AND is_deleted = 0", (data["device_id"],)).fetchone()
+            elif data.get("ip_address"):
+                device = conn.execute("SELECT * FROM network_devices WHERE ip_address = ? AND is_deleted = 0", (data["ip_address"],)).fetchone()
+            elif data.get("device_name"):
+                device = conn.execute("SELECT * FROM network_devices WHERE device_name = ? AND is_deleted = 0", (data["device_name"],)).fetchone()
+            if not device:
+                skipped += 1
+                errors.append({"index": index, "error": "matching device not found"})
+                continue
+            recent_rows = conn.execute(
+                """
+                SELECT rx_bps, tx_bps
+                FROM network_traffic_metrics
+                WHERE device_id = ?
+                ORDER BY collected_at DESC, id DESC
+                LIMIT 29
+                """,
+                (device["id"],),
+            ).fetchall()
+            rx_min, rx_max, rx_avg = _traffic_rollup([data.get("rx_bps"), *[row["rx_bps"] for row in recent_rows]])
+            tx_min, tx_max, tx_avg = _traffic_rollup([data.get("tx_bps"), *[row["tx_bps"] for row in recent_rows]])
+            columns = [
+                "device_id",
+                "interface_name",
+                "rx_bps",
+                "tx_bps",
+                "rx_min_bps",
+                "rx_max_bps",
+                "rx_avg_bps",
+                "tx_min_bps",
+                "tx_max_bps",
+                "tx_avg_bps",
+                "utilization_percent",
+                "source",
+                "raw_data_json",
+            ]
+            values: list[Any] = [
+                device["id"],
+                data.get("interface_name"),
+                data.get("rx_bps"),
+                data.get("tx_bps"),
+                rx_min,
+                rx_max,
+                rx_avg,
+                tx_min,
+                tx_max,
+                tx_avg,
+                data.get("utilization_percent"),
+                data.get("source") or "api-ingest",
+                json.dumps(data.get("raw_data") or {}, default=str),
+            ]
+            if data.get("collected_at"):
+                columns.insert(1, "collected_at")
+                values.insert(1, local_datetime_filter_to_utc_storage(str(data["collected_at"])))
+            placeholders = ", ".join(["?"] * len(columns))
+            conn.execute(
+                f"INSERT INTO network_traffic_metrics({', '.join(columns)}) VALUES ({placeholders})",
+                values,
+            )
+            inserted += 1
+        write_audit_log(
+            conn,
+            actor,
+            "IMPORT",
+            "TRAFFIC",
+            after_data={"inserted": inserted, "skipped": skipped, "errors": errors[:20]},
+            result="SUCCESS" if not errors else "PARTIAL",
+        )
+    return {"inserted": inserted, "skipped": skipped, "errors": errors[:20]}
 
 
 @app.post("/api/traffic/run")

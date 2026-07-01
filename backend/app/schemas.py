@@ -103,6 +103,34 @@ class DisplayDashboardRequest(BaseModel):
     include_ap: bool = True
 
 
+class TrafficConfigPayload(BaseModel):
+    traffic_collection_enabled: bool = True
+    traffic_collection_interval_seconds: int = Field(60, ge=10, le=3600)
+    traffic_default_provider: str = "demo"
+    traffic_generic_api_url: str | None = None
+    traffic_generic_api_token: str | None = None
+    cisco_wlc_controller_url: str | None = None
+    cisco_wlc_api_token: str | None = None
+    generic_snmp_community: str | None = None
+
+
+class TrafficObservationPayload(BaseModel):
+    device_id: int | None = None
+    ip_address: str | None = None
+    device_name: str | None = None
+    interface_name: str | None = None
+    rx_bps: float | None = None
+    tx_bps: float | None = None
+    utilization_percent: float | None = None
+    source: str = "api-ingest"
+    collected_at: str | None = None
+    raw_data: dict[str, Any] | None = None
+
+
+class TrafficObservationIngestRequest(BaseModel):
+    observations: list[TrafficObservationPayload] = Field(..., min_length=1, max_length=500)
+
+
 class APClientRegistrationPayload(BaseModel):
     device_name: str
     device_type: str = "OTHER"

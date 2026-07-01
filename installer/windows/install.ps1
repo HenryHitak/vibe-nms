@@ -262,6 +262,7 @@ NMS_BOOTSTRAP_ADMIN_USERNAME=admin
 NMS_BOOTSTRAP_ADMIN_PASSWORD=admin
 NMS_AUTH_SECRET=change-this-to-a-long-random-secret
 NMS_DISPLAY_API_TOKEN=
+NMS_SEED_SAMPLE_DATA=false
 "@ | Set-Content -LiteralPath $envPath -Encoding UTF8
 } else {
     $envLines = Get-Content -LiteralPath $envPath
@@ -275,9 +276,6 @@ NMS_DISPLAY_API_TOKEN=
         "NMS_TIME_ZONE" = "America/Tijuana"
         "NMS_PING_COUNT" = "3"
         "NMS_TCP_FALLBACK_PORTS" = "445,3389,80,443"
-        "NMS_TRAFFIC_COLLECTION_ENABLED" = "true"
-        "NMS_TRAFFIC_COLLECTION_INTERVAL_SECONDS" = "60"
-        "NMS_TRAFFIC_DEFAULT_PROVIDER" = "demo"
     }
     foreach ($key in $managedValues.Keys) {
         $value = $managedValues[$key]
@@ -313,8 +311,15 @@ NMS_DISPLAY_API_TOKEN=
         "NMS_MSSQL_DRIVER" = "ODBC Driver 18 for SQL Server"
         "NMS_MSSQL_ENCRYPT" = "true"
         "NMS_MSSQL_TRUST_SERVER_CERTIFICATE" = "true"
+        "NMS_TRAFFIC_COLLECTION_ENABLED" = "true"
+        "NMS_TRAFFIC_COLLECTION_INTERVAL_SECONDS" = "60"
+        "NMS_TRAFFIC_DEFAULT_PROVIDER" = "demo"
         "NMS_TRAFFIC_GENERIC_API_URL" = ""
         "NMS_TRAFFIC_GENERIC_API_TOKEN" = ""
+        "NMS_CISCO_WLC_CONTROLLER_URL" = ""
+        "NMS_CISCO_WLC_API_TOKEN" = ""
+        "NMS_GENERIC_SNMP_COMMUNITY" = ""
+        "NMS_SEED_SAMPLE_DATA" = "false"
     }
     foreach ($key in $missingOnlyValues.Keys) {
         $exists = $false

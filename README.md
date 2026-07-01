@@ -125,6 +125,9 @@ The browser does not collect traffic directly. The backend traffic collector wri
 ```text
 GET /api/traffic/summary
 POST /api/traffic/run
+GET /api/traffic/config
+PUT /api/traffic/config
+POST /api/traffic/observations
 ```
 
 Date range and bucket example:
@@ -142,6 +145,40 @@ NMS_TRAFFIC_DEFAULT_PROVIDER=demo
 ```
 
 The demo provider is for UI validation. For production, use a backend-only controller/SNMP/API source and keep tokens in `.env`, not in the frontend.
+
+Production installer builds set `NMS_SEED_SAMPLE_DATA=false` so a new company install starts with real imported devices only. Existing traffic source settings are preserved during reinstall/update.
+
+Real monitoring startup order:
+
+1. Install Vibe NMS on a PC/server inside the corporate network.
+2. Import or create real devices in `Device Master`.
+3. Confirm `monitoring_enabled` is ON for devices that should be checked.
+4. Let the backend ping worker update device ONLINE/WARNING/OFFLINE status.
+5. For traffic graphs, either configure `Traffic Graphs > Traffic Source` or POST real observations to `/api/traffic/observations`.
+
+To push real traffic observations from an internal collector:
+
+```json
+{
+  "observations": [
+    {
+      "ip_address": "105.102.8.106",
+      "interface_name": "Gi1/0/4",
+      "rx_bps": 12500000,
+      "tx_bps": 4200000,
+      "source": "cisco-controller"
+    }
+  ]
+}
+```
+
+Send it to:
+
+```text
+POST /api/traffic/observations
+```
+
+The backend matches the observation to `network_devices` by `device_id`, `ip_address`, or `device_name`.
 
 ## Windows Installer Without Docker
 

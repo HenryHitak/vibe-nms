@@ -46,6 +46,7 @@ def default_paths() -> None:
     os.environ.setdefault("NMS_TIME_ZONE", "America/Tijuana")
     os.environ.setdefault("NMS_BOOTSTRAP_ADMIN_USERNAME", "admin")
     os.environ.setdefault("NMS_BOOTSTRAP_ADMIN_PASSWORD", "admin")
+    os.environ.setdefault("NMS_SEED_SAMPLE_DATA", "false")
 
 
 def main() -> None:

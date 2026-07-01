@@ -69,6 +69,17 @@ function aggregate(values, key, mode) {
   return clean.reduce((sum, value) => sum + value, 0) / clean.length;
 }
 
+const EMPTY_CONFIG = {
+  traffic_collection_enabled: true,
+  traffic_collection_interval_seconds: 60,
+  traffic_default_provider: "demo",
+  traffic_generic_api_url: "",
+  traffic_generic_api_token: "",
+  cisco_wlc_controller_url: "",
+  cisco_wlc_api_token: "",
+  generic_snmp_community: ""
+};
+
 export default function TrafficGraphPage() {
   const user = getStoredUser();
   const isAdmin = String(user?.role || "").toUpperCase() === "ADMIN";
@@ -80,6 +91,10 @@ export default function TrafficGraphPage() {
   const [dateFrom, setDateFrom] = useState(() => rangeHours(6).dateFrom);
   const [dateTo, setDateTo] = useState(() => rangeHours(6).dateTo);
   const [bucket, setBucket] = useState("minute");
+  const [trafficConfig, setTrafficConfig] = useState(EMPTY_CONFIG);
+  const [configMeta, setConfigMeta] = useState(null);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configMessage, setConfigMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
@@ -115,6 +130,26 @@ export default function TrafficGraphPage() {
     const timer = setInterval(load, 10000);
     return () => clearInterval(timer);
   }, [plantFilter, lineFilter, deviceFilter, dateFrom, dateTo, bucket]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    async function loadConfig() {
+      try {
+        const next = await api("/traffic/config");
+        setConfigMeta(next);
+        setTrafficConfig({
+          ...EMPTY_CONFIG,
+          ...(next.pending || {}),
+          traffic_generic_api_token: "",
+          cisco_wlc_api_token: "",
+          generic_snmp_community: ""
+        });
+      } catch (err) {
+        setConfigMessage(err.message);
+      }
+    }
+    loadConfig();
+  }, [isAdmin]);
 
   const plantOptions = useMemo(
     () => [...new Set(devices.map((device) => device.plant_name || device.plant_code).filter(Boolean))].sort(),
@@ -160,13 +195,6 @@ export default function TrafficGraphPage() {
     }
   }
 
-  function applyQuickRange(hours, nextBucket = bucket) {
-    const next = rangeHours(hours);
-    setDateFrom(next.dateFrom);
-    setDateTo(next.dateTo);
-    setBucket(nextBucket);
-  }
-
   function resetFilters() {
     const next = rangeHours(6);
     setPlantFilter("");
@@ -175,6 +203,41 @@ export default function TrafficGraphPage() {
     setDateFrom(next.dateFrom);
     setDateTo(next.dateTo);
     setBucket("minute");
+  }
+
+  function changeTrafficConfig(event) {
+    const { name, value, type, checked } = event.target;
+    setTrafficConfig((current) => ({
+      ...current,
+      [name]: type === "checkbox" ? checked : value
+    }));
+  }
+
+  async function saveTrafficConfig() {
+    setConfigSaving(true);
+    setConfigMessage("");
+    try {
+      const saved = await api("/traffic/config", {
+        method: "PUT",
+        body: JSON.stringify({
+          ...trafficConfig,
+          traffic_collection_interval_seconds: Number(trafficConfig.traffic_collection_interval_seconds || 60)
+        })
+      });
+      setConfigMeta(saved);
+      setTrafficConfig((current) => ({
+        ...current,
+        traffic_generic_api_token: "",
+        cisco_wlc_api_token: "",
+        generic_snmp_community: ""
+      }));
+      setConfigMessage(saved.message || "Traffic source saved");
+      await load();
+    } catch (err) {
+      setConfigMessage(err.message);
+    } finally {
+      setConfigSaving(false);
+    }
   }
 
   const latest = payload?.latest || [];
@@ -228,11 +291,6 @@ export default function TrafficGraphPage() {
               <option value="minute">Per minute</option>
               <option value="hour">Per hour</option>
             </select>
-            <div className="flex h-10 items-center rounded-md border border-line bg-slate-50 p-1">
-              <button className="h-8 rounded px-2 text-xs font-semibold text-slate-700 hover:bg-white" onClick={() => applyQuickRange(1, "minute")}>1H</button>
-              <button className="h-8 rounded px-2 text-xs font-semibold text-slate-700 hover:bg-white" onClick={() => applyQuickRange(6, "minute")}>6H</button>
-              <button className="h-8 rounded px-2 text-xs font-semibold text-slate-700 hover:bg-white" onClick={() => applyQuickRange(24, "hour")}>24H</button>
-            </div>
             <button className="h-10 rounded-md border border-line bg-slate-50 px-3 text-sm font-semibold text-slate-700" onClick={resetFilters}>
               Reset
             </button>
@@ -246,6 +304,61 @@ export default function TrafficGraphPage() {
             ) : null}
           </div>
         </section>
+
+        {isAdmin ? (
+          <section className="mb-4 rounded-md border border-line bg-white p-4 shadow-sm">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">Traffic Source</h2>
+                <div className="text-xs text-slate-500">Runtime provider: {configMeta?.runtime?.traffic_default_provider || payload?.settings?.traffic_default_provider || "-"}</div>
+              </div>
+              <button className="h-10 rounded-md bg-ink px-3 text-sm font-semibold text-white disabled:opacity-60" onClick={saveTrafficConfig} disabled={configSaving}>
+                Save Source
+              </button>
+            </div>
+            {configMessage ? <div className="mb-3 rounded-md border border-line bg-slate-50 p-2 text-sm text-slate-700">{configMessage}</div> : null}
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+              <label className="flex items-center gap-2 rounded-md border border-line bg-slate-50 px-3 py-2 text-sm font-semibold">
+                <input type="checkbox" name="traffic_collection_enabled" checked={Boolean(trafficConfig.traffic_collection_enabled)} onChange={changeTrafficConfig} />
+                Collection ON
+              </label>
+              <label className="text-sm">
+                <div className="mb-1 text-xs font-semibold uppercase text-slate-500">Provider</div>
+                <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="traffic_default_provider" value={trafficConfig.traffic_default_provider || "demo"} onChange={changeTrafficConfig}>
+                  <option value="demo">demo</option>
+                  <option value="generic-api">generic-api</option>
+                  <option value="cisco-wlc">cisco-wlc</option>
+                  <option value="generic-snmp">generic-snmp</option>
+                  <option value="auto">auto</option>
+                </select>
+              </label>
+              <label className="text-sm">
+                <div className="mb-1 text-xs font-semibold uppercase text-slate-500">Interval Seconds</div>
+                <input className="h-10 w-full rounded-md border border-line px-3" type="number" min="10" max="3600" name="traffic_collection_interval_seconds" value={trafficConfig.traffic_collection_interval_seconds || 60} onChange={changeTrafficConfig} />
+              </label>
+              <label className="text-sm">
+                <div className="mb-1 text-xs font-semibold uppercase text-slate-500">SNMP Community</div>
+                <input className="h-10 w-full rounded-md border border-line px-3" type="password" name="generic_snmp_community" value={trafficConfig.generic_snmp_community || ""} onChange={changeTrafficConfig} placeholder={configMeta?.pending?.generic_snmp_community_configured ? "Configured" : "community"} />
+              </label>
+              <label className="text-sm lg:col-span-2">
+                <div className="mb-1 text-xs font-semibold uppercase text-slate-500">Generic API URL</div>
+                <input className="h-10 w-full rounded-md border border-line px-3" name="traffic_generic_api_url" value={trafficConfig.traffic_generic_api_url || ""} onChange={changeTrafficConfig} placeholder="https://controller/api" />
+              </label>
+              <label className="text-sm lg:col-span-2">
+                <div className="mb-1 text-xs font-semibold uppercase text-slate-500">Generic API Token</div>
+                <input className="h-10 w-full rounded-md border border-line px-3" type="password" name="traffic_generic_api_token" value={trafficConfig.traffic_generic_api_token || ""} onChange={changeTrafficConfig} placeholder={configMeta?.pending?.traffic_generic_api_token_configured ? "Configured" : "read-only token"} />
+              </label>
+              <label className="text-sm lg:col-span-2">
+                <div className="mb-1 text-xs font-semibold uppercase text-slate-500">Cisco WLC URL</div>
+                <input className="h-10 w-full rounded-md border border-line px-3" name="cisco_wlc_controller_url" value={trafficConfig.cisco_wlc_controller_url || ""} onChange={changeTrafficConfig} placeholder="https://wlc-controller/api" />
+              </label>
+              <label className="text-sm lg:col-span-2">
+                <div className="mb-1 text-xs font-semibold uppercase text-slate-500">Cisco WLC Token</div>
+                <input className="h-10 w-full rounded-md border border-line px-3" type="password" name="cisco_wlc_api_token" value={trafficConfig.cisco_wlc_api_token || ""} onChange={changeTrafficConfig} placeholder={configMeta?.pending?.cisco_wlc_api_token_configured ? "Configured" : "read-only token"} />
+              </label>
+            </div>
+          </section>
+        ) : null}
 
         <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <KpiCard label="Latest RX" value={formatBps(summary.current_rx_bps)} sublabel={`${summary.device_count || 0} devices / ${NMS_TIME_ZONE_LABEL}`} />

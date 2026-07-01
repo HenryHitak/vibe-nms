@@ -93,7 +93,8 @@ async def run_traffic_collection_cycle(conn: Any | None = None) -> dict[str, int
 async def traffic_collection_loop(stop_event: asyncio.Event) -> None:
     while not stop_event.is_set():
         try:
-            await run_traffic_collection_cycle()
+            if settings.traffic_collection_enabled:
+                await run_traffic_collection_cycle()
         except Exception:
             pass
         try:

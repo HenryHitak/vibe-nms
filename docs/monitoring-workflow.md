@@ -173,3 +173,26 @@ GET /api/traffic/summary?date_from=2026-06-30T00:00&date_to=2026-06-30T23:59&buc
 ```
 
 `date_from`과 `date_to`는 `NMS_TIME_ZONE` 기준으로 해석됩니다. 기본 installer 설정은 `America/Tijuana`입니다.
+
+실제 source를 연결하는 방식은 두 가지입니다.
+
+1. Backend pull: `Traffic Source`에서 `generic-api`를 설정하고 backend가 내부 API를 polling합니다.
+2. Collector push: 외부 collector가 `POST /api/traffic/observations`로 실제 RX/TX 값을 전송합니다.
+
+Production installer는 새 DB에 샘플 장비를 자동으로 넣지 않습니다. 실제 모니터링은 `Device Master`에 등록된 장비와 import된 장비를 기준으로 진행됩니다.
+
+Collector push payload:
+
+```json
+{
+  "observations": [
+    {
+      "device_id": 12,
+      "rx_bps": 12500000,
+      "tx_bps": 4200000,
+      "interface_name": "Gi1/0/4",
+      "source": "switch-snmp"
+    }
+  ]
+}
+```
