@@ -13,7 +13,7 @@ Cisco Controller는 AP와 무선 Client 정보를 알고 있고, Vibe NMS는 이
 
 ```mermaid
 flowchart LR
-    Device["Device<br/>PLC, PC, Scanner, HMI"] --> Identity["IP Address + MAC Address"]
+    Device["Device<br/>AP, PC, Laptop, Mobile, Tablet,<br/>PLC, Scanner, HMI, Server"] --> Identity["IP Address + MAC Address"]
     Identity --> Wired{"Connection Type"}
     Wired -- "Wired" --> Switch["Switch<br/>Switch Name + Port"]
     Wired -- "Wireless" --> AP["Access Point<br/>AP Name + AP IP"]
@@ -80,7 +80,16 @@ Cisco Controller는 무선 Client 정보에 강합니다.
 
 그래서 Vibe NMS는 Device Master를 기준 데이터로 두고, Controller 데이터는 "현재 AP 연결 상태" 확인용으로 사용합니다.
 
-## 6. Alert 예시
+## 6. Device Master 입력 기준
+
+기기마다 필요한 정보가 다르므로 확인된 정보만 넣습니다.
+
+- AP: AP 자체 관리 IP를 `IP Address`에 넣습니다. AP에는 `Connected AP IP`를 따로 넣지 않습니다.
+- PC/LAPTOP/MOBILE/TABLET/WORKSTATION: 장치 IP/MAC/Hostname을 넣고, 무선 AP 또는 Switch 위치는 확인된 경우에만 넣습니다.
+- PLC/HMI/ROBOT/SCANNER/CAMERA/PRINTER/SENSOR/IOT: 생산 장치의 IP와 MAC을 우선 넣고, AP/Switch 위치는 확인된 경우에만 넣습니다.
+- SWITCH/ROUTER/FIREWALL/CONTROLLER/SERVER/NAS/UPS: 인프라 장치 정보만 넣고, 무선 AP Client용 필드는 쓰지 않습니다.
+
+## 7. Alert 예시
 
 Unknown Client:
 

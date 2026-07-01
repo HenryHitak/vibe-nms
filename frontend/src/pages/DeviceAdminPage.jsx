@@ -31,7 +31,35 @@ const EMPTY_DEVICE = {
   notes: ""
 };
 
-function Field({ label, name, value, onChange, type = "text" }) {
+const DEVICE_TYPES = [
+  "AP",
+  "SWITCH",
+  "ROUTER",
+  "FIREWALL",
+  "CONTROLLER",
+  "SERVER",
+  "NAS",
+  "UPS",
+  "WORKSTATION",
+  "PC",
+  "LAPTOP",
+  "MOBILE",
+  "TABLET",
+  "PLC",
+  "HMI",
+  "ROBOT",
+  "SCANNER",
+  "CAMERA",
+  "PRINTER",
+  "SENSOR",
+  "IOT",
+  "OTHER"
+];
+
+const WIRELESS_CLIENT_TYPES = new Set(["WORKSTATION", "PC", "LAPTOP", "MOBILE", "TABLET", "IOT", "HMI", "PLC", "ROBOT", "SCANNER", "CAMERA", "PRINTER", "SENSOR"]);
+const SWITCH_PORT_TYPES = new Set(["AP", "WORKSTATION", "PC", "LAPTOP", "PLC", "HMI", "ROBOT", "SCANNER", "CAMERA", "PRINTER", "SENSOR", "IOT", "SERVER", "NAS", "UPS"]);
+
+function Field({ label, name, value, onChange, type = "text", hint }) {
   return (
     <label className="block text-sm">
       <span className="mb-1 block text-slate-600">{label}</span>
@@ -42,8 +70,22 @@ function Field({ label, name, value, onChange, type = "text" }) {
         value={value ?? ""}
         onChange={onChange}
       />
+      {hint ? <span className="mt-1 block text-xs leading-4 text-slate-500">{hint}</span> : null}
     </label>
   );
+}
+
+function FormSection({ title, children }) {
+  return (
+    <section className="rounded-md border border-line bg-slate-50 p-3">
+      <div className="mb-3 text-xs font-semibold uppercase text-slate-500">{title}</div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-1">{children}</div>
+    </section>
+  );
+}
+
+function normalizedType(value) {
+  return String(value || "OTHER").toUpperCase();
 }
 
 export default function DeviceAdminPage() {
@@ -91,13 +133,33 @@ export default function DeviceAdminPage() {
 
   async function save() {
     try {
+      const deviceType = normalizedType(form.device_type);
       const payload = {
         ...form,
         plant_code: form.plant_name,
         line_code: form.line_name,
         vlan: form.vlan === "" || form.vlan == null ? null : Number(form.vlan),
-        monitoring_enabled: true
+        device_type: deviceType,
+        monitoring_enabled: Boolean(form.monitoring_enabled)
       };
+      const supportsWireless = deviceType !== "AP" && WIRELESS_CLIENT_TYPES.has(deviceType);
+      const supportsSwitch = SWITCH_PORT_TYPES.has(deviceType);
+      if (deviceType === "AP") {
+        payload.connected_ap_name = null;
+        payload.connected_ap_ip = null;
+      } else {
+        payload.ap_vendor = null;
+        payload.ap_controller_type = null;
+        payload.ap_controller_id = null;
+      }
+      if (!supportsWireless) {
+        payload.connected_ap_name = null;
+        payload.connected_ap_ip = null;
+      }
+      if (!supportsSwitch) {
+        payload.switch_name = null;
+        payload.switch_port = null;
+      }
       if (editing?.id) {
         await api(`/devices/${editing.id}`, { method: "PUT", body: JSON.stringify(payload) });
       } else {
@@ -177,6 +239,11 @@ export default function DeviceAdminPage() {
       setError(err.message);
     }
   }
+
+  const deviceType = normalizedType(form.device_type);
+  const isAp = deviceType === "AP";
+  const showWirelessFields = !isAp && WIRELESS_CLIENT_TYPES.has(deviceType);
+  const showSwitchFields = SWITCH_PORT_TYPES.has(deviceType);
 
   return (
     <AdminLayout
@@ -302,53 +369,89 @@ export default function DeviceAdminPage() {
               <X size={15} />
             </button>
           </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-1">
-            <Field label="Plant Name" name="plant_name" value={form.plant_name} onChange={updateForm} />
-            <Field label="Line Name" name="line_name" value={form.line_name} onChange={updateForm} />
-            <Field label="Device Name" name="device_name" value={form.device_name} onChange={updateForm} />
-            <label className="block text-sm">
-              <span className="mb-1 block text-slate-600">Device Type</span>
-              <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="device_type" value={form.device_type} onChange={updateForm}>
-                {["AP", "CAMERA", "CONTROLLER", "HMI", "IOT", "PLC", "PRINTER", "ROBOT", "SCANNER", "SENSOR", "SWITCH", "SERVER", "WORKSTATION", "OTHER"].map((value) => (
-                  <option key={value} value={value}>{value}</option>
-                ))}
-              </select>
-            </label>
-            <Field label="IP Address" name="ip_address" value={form.ip_address} onChange={updateForm} />
-            <Field label="MAC Address" name="mac_address" value={form.mac_address} onChange={updateForm} />
-            <Field label="Hostname" name="hostname" value={form.hostname} onChange={updateForm} />
-            <Field label="Connected AP Name" name="connected_ap_name" value={form.connected_ap_name} onChange={updateForm} />
-            <Field label="Connected AP IP" name="connected_ap_ip" value={form.connected_ap_ip} onChange={updateForm} />
-            <Field label="AP Vendor" name="ap_vendor" value={form.ap_vendor} onChange={updateForm} />
-            <label className="block text-sm">
-              <span className="mb-1 block text-slate-600">AP Controller Type</span>
-              <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="ap_controller_type" value={form.ap_controller_type || ""} onChange={updateForm}>
-                <option value="">Default</option>
-                {["demo", "meraki-api", "aruba-central-api", "unifi-api", "cisco-wlc", "generic-snmp", "generic-api"].map((value) => (
-                  <option key={value} value={value}>{value}</option>
-                ))}
-              </select>
-            </label>
-            <Field label="AP Controller ID" name="ap_controller_id" value={form.ap_controller_id} onChange={updateForm} />
-            <Field label="Switch Name" name="switch_name" value={form.switch_name} onChange={updateForm} />
-            <Field label="Switch Port" name="switch_port" value={form.switch_port} onChange={updateForm} />
-            <Field label="VLAN" name="vlan" value={form.vlan ?? ""} onChange={updateForm} type="number" />
-            <Field label="Building" name="building" value={form.building} onChange={updateForm} />
-            <Field label="Floor" name="floor" value={form.floor} onChange={updateForm} />
-            <Field label="Area" name="area" value={form.area} onChange={updateForm} />
-            <Field label="Zone" name="zone" value={form.zone} onChange={updateForm} />
-            <Field label="Detailed Location" name="detailed_location" value={form.detailed_location} onChange={updateForm} />
-            <Field label="Owner Department" name="owner_department" value={form.owner_department} onChange={updateForm} />
-            <label className="block text-sm">
-              <span className="mb-1 block text-slate-600">Criticality</span>
-              <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="criticality" value={form.criticality} onChange={updateForm}>
-                {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((value) => <option key={value} value={value}>{value}</option>)}
-              </select>
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-slate-600">Notes</span>
-              <textarea className="min-h-20 w-full rounded-md border border-line bg-white px-3 py-2" name="notes" value={form.notes || ""} onChange={updateForm} />
-            </label>
+          <div className="mb-4 rounded-md border border-cyan-200 bg-cyan-50 p-3 text-sm text-cyan-900">
+            Enter only confirmed information. Optional fields can stay blank. The form changes by Device Type so AP, PC/Laptop, Mobile/Tablet, PLC, Switch, and Server records do not ask for unrelated fields.
+          </div>
+          <div className="space-y-4">
+            <FormSection title="Required identity">
+              <Field label="Plant Name" name="plant_name" value={form.plant_name} onChange={updateForm} />
+              <Field label="Line Name" name="line_name" value={form.line_name} onChange={updateForm} />
+              <Field label="Device Name" name="device_name" value={form.device_name} onChange={updateForm} />
+              <label className="block text-sm">
+                <span className="mb-1 block text-slate-600">Device Type</span>
+                <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="device_type" value={form.device_type} onChange={updateForm}>
+                  {DEVICE_TYPES.map((value) => (
+                    <option key={value} value={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+              <Field
+                label={isAp ? "AP Management IP" : "Device IP Address"}
+                name="ip_address"
+                value={form.ip_address}
+                onChange={updateForm}
+                hint={isAp ? "This is the AP's own management IP. Do not enter Connected AP IP for an AP." : "This is the device's own IP address."}
+              />
+              <label className="block text-sm">
+                <span className="mb-1 block text-slate-600">Criticality</span>
+                <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="criticality" value={form.criticality} onChange={updateForm}>
+                  {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" name="monitoring_enabled" checked={Boolean(form.monitoring_enabled)} onChange={updateForm} />
+                Monitoring enabled
+              </label>
+            </FormSection>
+
+            <FormSection title="Known identity">
+              <Field label="MAC Address" name="mac_address" value={form.mac_address} onChange={updateForm} hint="Optional. Useful for AP client matching and duplicate detection." />
+              <Field label="Hostname" name="hostname" value={form.hostname} onChange={updateForm} />
+              <Field label="VLAN" name="vlan" value={form.vlan ?? ""} onChange={updateForm} type="number" />
+              <Field label="Owner Department" name="owner_department" value={form.owner_department} onChange={updateForm} />
+            </FormSection>
+
+            {isAp ? (
+              <FormSection title="AP controller details">
+                <Field label="AP Vendor" name="ap_vendor" value={form.ap_vendor} onChange={updateForm} hint="Example: Cisco, Meraki, Aruba, UniFi." />
+                <label className="block text-sm">
+                  <span className="mb-1 block text-slate-600">AP Controller Type</span>
+                  <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="ap_controller_type" value={form.ap_controller_type || ""} onChange={updateForm}>
+                    <option value="">Default</option>
+                    {["demo", "meraki-api", "aruba-central-api", "unifi-api", "cisco-wlc", "generic-snmp", "generic-api"].map((value) => (
+                      <option key={value} value={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <Field label="AP Controller ID" name="ap_controller_id" value={form.ap_controller_id} onChange={updateForm} />
+              </FormSection>
+            ) : null}
+
+            {showWirelessFields ? (
+              <FormSection title="Expected wireless AP">
+                <Field label="Expected AP Name" name="connected_ap_name" value={form.connected_ap_name} onChange={updateForm} hint="Only enter this if the expected AP is confirmed." />
+                <Field label="Expected AP IP" name="connected_ap_ip" value={form.connected_ap_ip} onChange={updateForm} hint="Optional. Used to detect wrong AP connections." />
+              </FormSection>
+            ) : null}
+
+            {showSwitchFields ? (
+              <FormSection title="Switch connection">
+                <Field label="Switch Name" name="switch_name" value={form.switch_name} onChange={updateForm} />
+                <Field label="Switch Port" name="switch_port" value={form.switch_port} onChange={updateForm} />
+              </FormSection>
+            ) : null}
+
+            <FormSection title="Location and notes">
+              <Field label="Building" name="building" value={form.building} onChange={updateForm} />
+              <Field label="Floor" name="floor" value={form.floor} onChange={updateForm} />
+              <Field label="Area" name="area" value={form.area} onChange={updateForm} />
+              <Field label="Zone" name="zone" value={form.zone} onChange={updateForm} />
+              <Field label="Detailed Location" name="detailed_location" value={form.detailed_location} onChange={updateForm} />
+              <label className="block text-sm">
+                <span className="mb-1 block text-slate-600">Notes</span>
+                <textarea className="min-h-20 w-full rounded-md border border-line bg-white px-3 py-2" name="notes" value={form.notes || ""} onChange={updateForm} />
+              </label>
+            </FormSection>
             <button className="mt-2 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-ink px-3 text-sm font-semibold text-white" onClick={save}>
               <Save size={16} /> Save
             </button>

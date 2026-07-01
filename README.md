@@ -48,6 +48,13 @@ Excel device import/export is managed from `Device Master`:
 - `Excel Import`: upload and preview a device workbook, then commit valid rows.
 - `Excel Export`: download the current device list as `devices.xlsx`.
 
+Device Master changes the input form by `Device Type`. Enter only confirmed information:
+
+- `AP`: AP management IP, AP vendor/controller details, and switch uplink if known. Do not enter a separate connected AP IP for an AP.
+- `PC`, `LAPTOP`, `MOBILE`, `TABLET`, `WORKSTATION`: device IP/MAC/hostname, and expected AP or switch fields only when confirmed.
+- `PLC`, `HMI`, `ROBOT`, `SCANNER`, `CAMERA`, `PRINTER`, `SENSOR`, `IOT`: production device identity plus expected AP or switch fields only when confirmed.
+- `SWITCH`, `ROUTER`, `FIREWALL`, `CONTROLLER`, `SERVER`, `NAS`, `UPS`: infrastructure identity fields; unrelated wireless AP fields are hidden or cleared.
+
 ## Monitoring Behavior
 
 The backend collector continuously monitors every registered active device IP.
@@ -111,18 +118,7 @@ Use read-only controller/API tokens whenever possible. These tokens are never re
 
 Open `AP Clients` to see each AP's status, connected client count, known/unknown counts, connected IP list, MAC, hostname, SSID, VLAN, RSSI, last seen time, and status. Admins can manually run discovery from that page; manual runs are written to `Audit Logs` with username and source IP.
 
-Admins can also use `AP Clients` as a CRUD screen for known wireless clients. Registering an observed client creates a `network_devices` row tied to the selected AP, so future discovery runs can mark it as known, detect wrong AP connections, and monitor missing critical clients.
-
-AP client CRUD endpoints:
-
-```text
-GET /api/access-points/{ap_id}/registered-clients
-POST /api/access-points/{ap_id}/registered-clients
-PUT /api/access-points/{ap_id}/registered-clients/{device_id}
-DELETE /api/access-points/{ap_id}/registered-clients/{device_id}
-```
-
-Deleting a registered AP client soft-deletes the underlying Device Master row and writes an audit log.
+`AP Clients` is a monitoring-only screen. It does not create, edit, or delete client records. To register a known wireless device, add it in `Device Master`, select the correct device type such as `PC`, `LAPTOP`, `MOBILE`, `TABLET`, `SCANNER`, or `IOT`, and enter expected AP information only when it is confirmed.
 
 ## Traffic Graphs
 
@@ -574,7 +570,7 @@ Use `Device Master > Excel Import`:
 
 ```text
 1. Download devices-template.xlsx
-2. Fill plant, line, AP, IP, switch, VLAN, owner, criticality, and monitoring fields
+2. Fill plant, line, device type, IP, and only confirmed AP/switch/VLAN/owner/criticality fields
 3. Upload the file to preview validation
 4. Commit only after validation passes
 ```

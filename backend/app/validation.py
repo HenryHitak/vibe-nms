@@ -11,15 +11,23 @@ VALID_DEVICE_TYPES = {
     "AP",
     "CAMERA",
     "CONTROLLER",
+    "FIREWALL",
     "HMI",
     "IOT",
+    "LAPTOP",
+    "MOBILE",
+    "NAS",
     "PLC",
+    "PC",
     "PRINTER",
     "ROBOT",
+    "ROUTER",
     "SCANNER",
     "SENSOR",
     "SWITCH",
     "SERVER",
+    "TABLET",
+    "UPS",
     "WORKSTATION",
     "OTHER",
 }
@@ -76,4 +84,3 @@ def ip_in_allowed_networks(ip_address: str) -> bool:
         except ValueError:
             continue
     return False
-
