@@ -23,10 +23,12 @@ flowchart LR
     Controller --> APs["Registered Access Points"]
     APs --> Clients["Connected Wireless Clients"]
 
-    PingWorker --> Alerts["Alerts + Notifications"]
+    PingWorker --> Alerts["Alerts"]
     APWorker --> Alerts
+    Alerts --> Notifications["Notifications<br/>skips muted types"]
     TrafficWorker --> TrafficDB["network_traffic_metrics"]
     Alerts --> Backend
+    Notifications --> Backend
     TrafficDB --> Backend
 ```
 

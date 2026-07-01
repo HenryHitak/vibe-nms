@@ -15,6 +15,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from .alert_settings import (
+    AP_ALERT_SETTING_BY_TYPE,
+    NETWORK_ALERT_SETTING_BY_TYPE,
+    bool_value,
+    notification_mute_key,
+    notification_muted,
+)
 from .ap_client_discovery_worker import AP_CLIENT_ALERT_TYPES, ap_client_discovery_loop, run_ap_client_discovery_cycle
 from .audit import changed_fields, write_audit_log
 from .auth import bearer_token_from_request, create_token, decode_token, hash_password, normalize_role, verify_password
@@ -46,6 +53,7 @@ from .schemas import (
     DisplayDashboardRequest,
     ImportCommitRequest,
     LoginRequest,
+    NotificationMutePayload,
     PasswordResetPayload,
     TrafficConfigPayload,
     TrafficObservationIngestRequest,
@@ -2316,9 +2324,106 @@ def resolve_alert(alert_id: int, actor: Actor = Depends(get_actor)) -> dict[str,
 def list_notifications(unread_only: bool = False) -> list[dict[str, Any]]:
     where = "WHERE read_at IS NULL" if unread_only else ""
     with transaction() as conn:
-        return rows_to_dicts(
-            conn.execute(f"SELECT * FROM notifications {where} ORDER BY created_at DESC LIMIT 100").fetchall()
+        notifications = rows_to_dicts(
+            conn.execute(
+                f"""
+                SELECT n.*, a.alert_type, a.severity, a.status AS alert_status,
+                       d.device_name, d.ip_address
+                FROM notifications n
+                LEFT JOIN alerts a ON a.id = n.alert_id
+                LEFT JOIN network_devices d ON d.id = a.device_id
+                {where}
+                ORDER BY n.created_at DESC
+                LIMIT 100
+                """
+            ).fetchall()
         )
+        for notification in notifications:
+            notification["notification_muted"] = notification_muted(conn, notification.get("alert_type") or "")
+        return notifications
+
+
+def _known_notification_alert_types(conn: sqlite3.Connection) -> list[str]:
+    known = set(NETWORK_ALERT_SETTING_BY_TYPE) | set(AP_ALERT_SETTING_BY_TYPE)
+    rows = conn.execute("SELECT DISTINCT alert_type FROM alerts WHERE alert_type IS NOT NULL").fetchall()
+    known.update(str(row["alert_type"]).upper() for row in rows if row["alert_type"])
+    return sorted(known)
+
+
+@app.get("/api/notification-mutes")
+def list_notification_mutes() -> list[dict[str, Any]]:
+    with transaction() as conn:
+        rows = rows_to_dicts(
+            conn.execute(
+                """
+                SELECT key, value, updated_by, updated_from_ip, updated_at
+                FROM system_settings
+                WHERE key LIKE 'notification_mute_%'
+                ORDER BY key
+                """
+            ).fetchall()
+        )
+        by_key = {row["key"]: row for row in rows}
+        result: list[dict[str, Any]] = []
+        for alert_type in _known_notification_alert_types(conn):
+            key = notification_mute_key(alert_type)
+            row = by_key.get(key, {})
+            result.append(
+                {
+                    "alert_type": alert_type,
+                    "muted": bool_value(row.get("value")) if row else False,
+                    "key": key,
+                    "updated_by": row.get("updated_by"),
+                    "updated_from_ip": row.get("updated_from_ip"),
+                    "updated_at": row.get("updated_at"),
+                }
+            )
+        return result
+
+
+@app.post("/api/notification-mutes/{alert_type}")
+def set_notification_mute(alert_type: str, payload: NotificationMutePayload, actor: Actor = Depends(get_actor)) -> dict[str, Any]:
+    require_admin(actor)
+    normalized_type = str(alert_type or "").upper()
+    key = notification_mute_key(normalized_type)
+    value = "true" if payload.muted else "false"
+    with transaction() as conn:
+        before = row_to_dict(conn.execute("SELECT * FROM system_settings WHERE key = ?", (key,)).fetchone())
+        if before:
+            conn.execute(
+                """
+                UPDATE system_settings
+                SET value = ?, updated_by = ?, updated_from_ip = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE key = ?
+                """,
+                (value, actor.username, actor.ip_address, key),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO system_settings(key, value, updated_by, updated_from_ip)
+                VALUES (?, ?, ?, ?)
+                """,
+                (key, value, actor.username, actor.ip_address),
+            )
+        after = row_to_dict(conn.execute("SELECT * FROM system_settings WHERE key = ?", (key,)).fetchone()) or {}
+        write_audit_log(
+            conn,
+            actor,
+            "MUTE_NOTIFICATION" if payload.muted else "UNMUTE_NOTIFICATION",
+            "NOTIFICATION",
+            entity_id=normalized_type,
+            before_data=before,
+            after_data=after,
+            changed=changed_fields(before or {}, after),
+        )
+        return {
+            "alert_type": normalized_type,
+            "muted": payload.muted,
+            "key": key,
+            "updated_by": actor.username,
+            "updated_from_ip": actor.ip_address,
+        }
 
 
 @app.post("/api/notifications/{notification_id}/read")

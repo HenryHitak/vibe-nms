@@ -73,7 +73,7 @@ SQL Server 2025 Express에서는 SQL Agent, Enterprise 기능, CLR이 필요 없
 - User Accounts CRUD
 - Excel import/export
 - Audit Logs 기록
-- Alert 생성, acknowledge, resolve
+- Alert 생성, acknowledge, resolve, notification mute
 - DB Config 저장과 connection test
 - Dashboard 데이터 제공
 - Display API 제공

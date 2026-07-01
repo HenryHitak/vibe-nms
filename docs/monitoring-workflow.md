@@ -125,6 +125,8 @@ Alert type 예시:
 
 다시 ONLINE이 되면 기존 ACTIVE 또는 ACKNOWLEDGED Alert는 RESOLVED로 바뀝니다.
 
+`Settings > Alarm Settings`에서 Alert type을 끄면 해당 Alert 자체가 새로 생성되지 않습니다. `Alert Center`에서 Alert type을 mute하면 Alert는 계속 생성/업데이트되지만 새 notification만 생성되지 않습니다.
+
 ## 7. AP Client Discovery는 별도 worker
 
 Ping monitoring과 AP Client Discovery는 서로 다른 worker입니다.

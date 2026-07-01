@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -50,3 +51,17 @@ def network_alert_enabled(conn: Any, alert_type: str) -> bool:
 def ap_alert_enabled(conn: Any, alert_type: str) -> bool:
     key = AP_ALERT_SETTING_BY_TYPE.get(str(alert_type or "").upper())
     return True if not key else setting_enabled(conn, key)
+
+
+def bool_value(value: Any) -> bool:
+    return str(value).strip().lower() in {"1", "true", "yes", "on", "enabled", "muted"}
+
+
+def notification_mute_key(alert_type: str) -> str:
+    normalized = re.sub(r"[^A-Z0-9]+", "_", str(alert_type or "").upper()).strip("_")
+    return f"notification_mute_{normalized or 'UNKNOWN'}"
+
+
+def notification_muted(conn: Any, alert_type: str) -> bool:
+    row = conn.execute("SELECT value FROM system_settings WHERE key = ?", (notification_mute_key(alert_type),)).fetchone()
+    return bool_value(row["value"]) if row else False

@@ -5,7 +5,7 @@ import time
 from collections import Counter
 from typing import Any
 
-from .alert_settings import ap_alert_enabled
+from .alert_settings import ap_alert_enabled, notification_muted
 from .ap_client_providers import APClientObservation, normalize_mac, provider_for_ap, utc_now_iso
 from .config import settings
 from .db import connect, row_to_dict, rows_to_dicts
@@ -129,13 +129,14 @@ def _upsert_alert(conn: Any, device_id: int, alert_type: str, severity: str, mes
         """,
         (device_id, severity, alert_type, message),
     )
-    conn.execute(
-        """
-        INSERT INTO notifications(alert_id, recipient_role, title, message, channel)
-        VALUES (?, 'ADMIN', ?, ?, 'DASHBOARD')
-        """,
-        (cursor.lastrowid, f"{severity} AP client issue", message),
-    )
+    if not notification_muted(conn, alert_type):
+        conn.execute(
+            """
+            INSERT INTO notifications(alert_id, recipient_role, title, message, channel)
+            VALUES (?, 'ADMIN', ?, ?, 'DASHBOARD')
+            """,
+            (cursor.lastrowid, f"{severity} AP client issue", message),
+        )
 
 
 def _resolve_alert(conn: Any, device_id: int, alert_type: str) -> None:

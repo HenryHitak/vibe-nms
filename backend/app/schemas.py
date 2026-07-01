@@ -71,6 +71,10 @@ class NotificationReadRequest(BaseModel):
     read: bool = True
 
 
+class NotificationMutePayload(BaseModel):
+    muted: bool = True
+
+
 class SettingValue(BaseModel):
     value: str
 

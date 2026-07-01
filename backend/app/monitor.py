@@ -7,7 +7,7 @@ import sqlite3
 import time
 from dataclasses import dataclass
 
-from .alert_settings import network_alert_enabled
+from .alert_settings import network_alert_enabled, notification_muted
 from .config import settings
 from .db import connect, row_to_dict
 from .validation import ip_in_allowed_networks
@@ -253,13 +253,14 @@ def upsert_alert_for_status(
             """,
             (device["id"], severity, alert_type, message),
         )
-        conn.execute(
-            """
-            INSERT INTO notifications(alert_id, recipient_role, title, message, channel)
-            VALUES (?, 'ADMIN', ?, ?, 'DASHBOARD')
-            """,
-            (cursor.lastrowid, f"{severity} network alert", message),
-        )
+        if not notification_muted(conn, alert_type):
+            conn.execute(
+                """
+                INSERT INTO notifications(alert_id, recipient_role, title, message, channel)
+                VALUES (?, 'ADMIN', ?, ?, 'DASHBOARD')
+                """,
+                (cursor.lastrowid, f"{severity} network alert", message),
+            )
 
 
 async def run_monitoring_cycle(conn: sqlite3.Connection | None = None) -> dict[str, int]:

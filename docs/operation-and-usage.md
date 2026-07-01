@@ -202,6 +202,8 @@ Traffic Graphs 화면의 `Traffic Source`에서 provider를 `generic-api`로 바
 
 장치 하나라도 떨어지면 Alert가 생성되고 Dashboard 상단 banner와 notification에 표시됩니다. 상단 Critical/Warning banner는 X 버튼으로 닫을 수 있지만, 실제 Alert가 resolve되는 것은 아닙니다. 실제 처리는 `Alert Center`에서 acknowledge 또는 resolve합니다.
 
+`Alert Center`의 `Acknowledge`는 관리자가 확인했다는 표시이며 Alert는 계속 남습니다. `Resolve`는 Alert를 종료합니다. `Mute`는 해당 Alert type의 새 notification만 막고, Alert 기록과 상태는 그대로 유지합니다.
+
 ## 10. Dashboard를 다른 화면에 띄우기
 
 전체 화면:
