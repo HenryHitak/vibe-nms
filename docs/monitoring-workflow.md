@@ -149,8 +149,8 @@ flowchart TD
     Source --> Snapshot["Collect RX bps and TX bps"]
     Snapshot --> Rollup["Calculate min / avg / max"]
     Rollup --> Store["Insert network_traffic_metrics"]
-    Store --> API["GET /api/traffic/summary"]
-    API --> UI["Traffic Graphs tab"]
+Store --> API["GET /api/traffic/summary"]
+API --> UI["Traffic Graphs tab"]
 ```
 
 기본값:
@@ -164,3 +164,12 @@ NMS_TRAFFIC_GENERIC_API_TOKEN=
 ```
 
 `demo` provider는 UI 확인용입니다. 실제 traffic은 Cisco Controller, SNMP, 또는 사내 collector API에서 백엔드가 가져와야 합니다.
+
+Traffic Graphs API는 날짜 range와 그래프 단위를 받습니다.
+
+```text
+GET /api/traffic/summary?date_from=2026-06-30T08:00&date_to=2026-06-30T17:00&bucket=minute
+GET /api/traffic/summary?date_from=2026-06-30T00:00&date_to=2026-06-30T23:59&bucket=hour
+```
+
+`date_from`과 `date_to`는 `NMS_TIME_ZONE` 기준으로 해석됩니다. 기본 installer 설정은 `America/Tijuana`입니다.

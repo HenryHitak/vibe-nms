@@ -53,3 +53,24 @@ def local_datetime_filter_to_utc_storage(value: str) -> str:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=app_zone())
     return parsed.astimezone(timezone.utc).replace(tzinfo=None, microsecond=0).strftime(STORAGE_FORMAT)
+
+
+def utc_storage_to_local_label(value: object, bucket: str = "minute") -> str:
+    if not value:
+        return ""
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        text = str(value).strip().replace("T", " ")
+        if not text:
+            return ""
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            return text[:13] + ":00" if bucket == "hour" and len(text) >= 13 else text[:16]
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    local = parsed.astimezone(app_zone()).replace(second=0, microsecond=0)
+    if bucket == "hour":
+        local = local.replace(minute=0)
+    return local.strftime("%Y-%m-%d %H:%M")

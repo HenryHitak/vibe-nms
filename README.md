@@ -116,6 +116,8 @@ It includes:
 - TX min / avg / max
 - TX/RX trend graph
 - Top traffic devices
+- Date range filtering
+- Per-minute and hourly graph buckets
 - Latest interface traffic table with Device, IP, AP, Switch, interface, source, and last collected time
 
 The browser does not collect traffic directly. The backend traffic collector writes snapshots to `network_traffic_metrics`, and the UI reads them from:
@@ -124,6 +126,14 @@ The browser does not collect traffic directly. The backend traffic collector wri
 GET /api/traffic/summary
 POST /api/traffic/run
 ```
+
+Date range and bucket example:
+
+```text
+GET /api/traffic/summary?date_from=2026-06-30T08:00&date_to=2026-06-30T17:00&bucket=hour
+```
+
+Traffic date filters are interpreted in `NMS_TIME_ZONE` (`America/Tijuana` by default).
 
 MVP default provider:
 

@@ -131,7 +131,7 @@ flowchart TD
     Provider --> Collect["Collect RX/TX bps"]
     Collect --> Rollup["Calculate min / avg / max"]
     Rollup --> Store["network_traffic_metrics"]
-    Store --> Summary["GET /api/traffic/summary"]
+    Store --> Summary["GET /api/traffic/summary<br/>date_from, date_to, bucket"]
     Summary --> Page["Traffic Graphs tab"]
     Summary --> Display["Display API traffic block"]
 ```

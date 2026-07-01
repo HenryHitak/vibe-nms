@@ -98,6 +98,12 @@ NMS_TRAFFIC_GENERIC_API_TOKEN=
 
 `Traffic Graphs` shows TX/RX current, min, avg, max, trend, and top traffic devices. The default `demo` provider is for UI validation. For production, connect a controller/SNMP/API collector and keep API tokens in backend `.env` only.
 
+Traffic graphs support date range filtering and per-minute/per-hour buckets. Date filters use the Mexico/Tijuana time base:
+
+```text
+GET /api/traffic/summary?date_from=2026-06-30T08:00&date_to=2026-06-30T17:00&bucket=hour
+```
+
 Screen timestamps use Mexico/Tijuana by default:
 
 ```text

@@ -52,7 +52,7 @@ from .schemas import (
 )
 from .security import Actor, actor_from_request, require_admin
 from .traffic_monitoring_worker import traffic_collection_loop, run_traffic_collection_cycle
-from .timezone import local_datetime_filter_to_utc_storage
+from .timezone import local_datetime_filter_to_utc_storage, utc_storage_to_local_label
 from .validation import VALID_CRITICALITY, VALID_DEVICE_TYPES, normalize_upper, validate_ip, validate_mac
 
 
@@ -443,13 +443,8 @@ def _number(value: Any) -> float | None:
         return None
 
 
-def _traffic_bucket(value: Any) -> str:
-    if hasattr(value, "isoformat"):
-        text = value.isoformat(sep=" ")
-    else:
-        text = str(value or "")
-    text = text.replace("T", " ")
-    return text[:16] if len(text) >= 16 else text
+def _traffic_bucket(value: Any, bucket: str) -> str:
+    return utc_storage_to_local_label(value, bucket)
 
 
 def _traffic_filter_clauses(filters: dict[str, Any]) -> tuple[list[str], list[Any]]:
@@ -457,12 +452,24 @@ def _traffic_filter_clauses(filters: dict[str, Any]) -> tuple[list[str], list[An
     if filters.get("device_id"):
         clauses.append("d.id = ?")
         params.append(int(filters["device_id"]))
+    if filters.get("date_from"):
+        clauses.append("t.collected_at >= ?")
+        params.append(local_datetime_filter_to_utc_storage(str(filters["date_from"])))
+    if filters.get("date_to"):
+        clauses.append("t.collected_at <= ?")
+        date_to = str(filters["date_to"]).strip()
+        if len(date_to) == 16:
+            date_to = f"{date_to}:59"
+        params.append(local_datetime_filter_to_utc_storage(date_to))
     return clauses, params
 
 
 def _traffic_summary_payload(conn: sqlite3.Connection, filters: dict[str, Any]) -> dict[str, Any]:
     point_limit = min(max(int(filters.get("point_limit") or 240), 10), 2000)
     device_limit = min(max(int(filters.get("device_limit") or 200), 1), 1000)
+    bucket = str(filters.get("bucket") or "minute").strip().lower()
+    if bucket not in {"minute", "hour"}:
+        bucket = "minute"
     clauses, params = _traffic_filter_clauses(filters)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     latest_rows = rows_to_dicts(
@@ -490,6 +497,41 @@ def _traffic_summary_payload(conn: sqlite3.Connection, filters: dict[str, Any]) 
             params + [device_limit],
         ).fetchall()
     )
+    range_rows = rows_to_dicts(
+        conn.execute(
+            f"""
+            SELECT t.device_id,
+                   d.device_name, d.device_type, d.ip_address,
+                   COALESCE(d.plant_name, d.plant_code) AS plant_name,
+                   COALESCE(d.line_name, d.line_code) AS line_name,
+                   d.connected_ap_name, d.connected_ap_ip, d.switch_name, d.switch_port,
+                   MIN(t.rx_bps) AS rx_min_bps,
+                   MAX(t.rx_bps) AS rx_max_bps,
+                   AVG(t.rx_bps) AS rx_avg_bps,
+                   MIN(t.tx_bps) AS tx_min_bps,
+                   MAX(t.tx_bps) AS tx_max_bps,
+                   AVG(t.tx_bps) AS tx_avg_bps,
+                   COUNT(*) AS sample_count,
+                   MAX(t.collected_at) AS last_collected_at
+            FROM network_traffic_metrics t
+            JOIN network_devices d ON d.id = t.device_id
+            {where}
+            GROUP BY t.device_id, d.device_name, d.device_type, d.ip_address,
+                     COALESCE(d.plant_name, d.plant_code), COALESCE(d.line_name, d.line_code),
+                     d.connected_ap_name, d.connected_ap_ip, d.switch_name, d.switch_port
+            ORDER BY COALESCE(AVG(t.rx_bps), 0) + COALESCE(AVG(t.tx_bps), 0) DESC, d.device_name
+            LIMIT ?
+            """,
+            params + [device_limit],
+        ).fetchall()
+    )
+    range_by_device = {row.get("device_id"): row for row in range_rows}
+    for row in latest_rows:
+        stats = range_by_device.get(row.get("device_id"))
+        if not stats:
+            continue
+        for key in ("rx_min_bps", "rx_max_bps", "rx_avg_bps", "tx_min_bps", "tx_max_bps", "tx_avg_bps", "sample_count"):
+            row[key] = stats.get(key)
     recent_rows = rows_to_dicts(
         conn.execute(
             f"""
@@ -512,13 +554,13 @@ def _traffic_summary_payload(conn: sqlite3.Connection, filters: dict[str, Any]) 
     )
     buckets: dict[str, dict[str, Any]] = {}
     for row in reversed(recent_rows):
-        bucket = _traffic_bucket(row.get("collected_at"))
-        if not bucket:
+        bucket_key = _traffic_bucket(row.get("collected_at"), bucket)
+        if not bucket_key:
             continue
         item = buckets.setdefault(
-            bucket,
+            bucket_key,
             {
-                "time": bucket,
+                "time": bucket_key,
                 "rx_bps": 0.0,
                 "tx_bps": 0.0,
                 "rx_max_bps": 0.0,
@@ -535,6 +577,10 @@ def _traffic_summary_payload(conn: sqlite3.Connection, filters: dict[str, Any]) 
         item["sample_count"] += 1
     current_rx_values = [_number(row.get("rx_bps")) for row in latest_rows]
     current_tx_values = [_number(row.get("tx_bps")) for row in latest_rows]
+    range_rx_avg_values = [_number(row.get("rx_avg_bps")) for row in range_rows]
+    range_tx_avg_values = [_number(row.get("tx_avg_bps")) for row in range_rows]
+    range_rx_max_values = [_number(row.get("rx_max_bps")) for row in range_rows]
+    range_tx_max_values = [_number(row.get("tx_max_bps")) for row in range_rows]
     latest_times = [str(row.get("collected_at")) for row in latest_rows if row.get("collected_at")]
     source_counts: dict[str, int] = {}
     for row in latest_rows:
@@ -545,6 +591,9 @@ def _traffic_summary_payload(conn: sqlite3.Connection, filters: dict[str, Any]) 
             "plant": filters.get("plant"),
             "line": filters.get("line"),
             "device_id": filters.get("device_id"),
+            "date_from": filters.get("date_from"),
+            "date_to": filters.get("date_to"),
+            "bucket": bucket,
             "point_limit": point_limit,
             "device_limit": device_limit,
         },
@@ -563,10 +612,21 @@ def _traffic_summary_payload(conn: sqlite3.Connection, filters: dict[str, Any]) 
             "avg_tx_bps": round(sum(value or 0 for value in current_tx_values) / len(latest_rows), 2) if latest_rows else 0,
             "last_collected_at": max(latest_times) if latest_times else None,
             "source_counts": source_counts,
+            "range_avg_rx_bps": round(sum(value or 0 for value in range_rx_avg_values), 2),
+            "range_avg_tx_bps": round(sum(value or 0 for value in range_tx_avg_values), 2),
+            "range_max_rx_bps": max([value or 0 for value in range_rx_max_values], default=0),
+            "range_max_tx_bps": max([value or 0 for value in range_tx_max_values], default=0),
         },
         "timeseries": list(buckets.values()),
         "latest": latest_rows,
-        "top_devices": latest_rows[:10],
+        "top_devices": [
+            {
+                **row,
+                "rx_bps": row.get("rx_avg_bps"),
+                "tx_bps": row.get("tx_avg_bps"),
+            }
+            for row in range_rows[:10]
+        ],
     }
 
 
@@ -1115,20 +1175,29 @@ def traffic_summary(
     plant: str | None = None,
     line: str | None = None,
     device_id: int | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    bucket: str = Query("minute", pattern="^(minute|hour)$"),
     point_limit: int = Query(240, ge=10, le=2000),
     device_limit: int = Query(200, ge=1, le=1000),
 ) -> dict[str, Any]:
-    with transaction() as conn:
-        return _traffic_summary_payload(
-            conn,
-            {
-                "plant": plant,
-                "line": line,
-                "device_id": device_id,
-                "point_limit": point_limit,
-                "device_limit": device_limit,
-            },
-        )
+    try:
+        with transaction() as conn:
+            return _traffic_summary_payload(
+                conn,
+                {
+                    "plant": plant,
+                    "line": line,
+                    "device_id": device_id,
+                    "date_from": date_from,
+                    "date_to": date_to,
+                    "bucket": bucket,
+                    "point_limit": point_limit,
+                    "device_limit": device_limit,
+                },
+            )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Invalid traffic date range") from exc
 
 
 @app.post("/api/traffic/run")

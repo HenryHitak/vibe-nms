@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Activity, BarChart3, Filter, Play, RefreshCcw } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api, getStoredUser } from "../api.js";
+import { NMS_TIME_ZONE, NMS_TIME_ZONE_LABEL } from "../time.js";
 
 function formatBps(value) {
   const number = Number(value || 0);
@@ -15,9 +16,39 @@ function toMbps(value) {
   return Number(((Number(value || 0)) / 1_000_000).toFixed(2));
 }
 
-function timeLabel(value) {
+function toTijuanaDateTimeLocal(date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: NMS_TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      hourCycle: "h23"
+    }).formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
+function rangeHours(hours) {
+  const end = new Date();
+  const start = new Date(end.getTime() - (hours * 60 * 60 * 1000));
+  return {
+    dateFrom: toTijuanaDateTimeLocal(start),
+    dateTo: toTijuanaDateTimeLocal(end)
+  };
+}
+
+function timeLabel(value, bucket) {
   const text = String(value || "");
-  return text.length >= 16 ? text.slice(11, 16) : text;
+  if (text.length >= 16) {
+    return bucket === "hour" ? `${text.slice(5, 13)}:00` : text.slice(5, 16);
+  }
+  return text;
 }
 
 function KpiCard({ label, value, sublabel }) {
@@ -46,6 +77,9 @@ export default function TrafficGraphPage() {
   const [plantFilter, setPlantFilter] = useState("");
   const [lineFilter, setLineFilter] = useState("");
   const [deviceFilter, setDeviceFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState(() => rangeHours(6).dateFrom);
+  const [dateTo, setDateTo] = useState(() => rangeHours(6).dateTo);
+  const [bucket, setBucket] = useState("minute");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
@@ -57,7 +91,10 @@ export default function TrafficGraphPage() {
       if (plantFilter) query.set("plant", plantFilter);
       if (lineFilter) query.set("line", lineFilter);
       if (deviceFilter) query.set("device_id", deviceFilter);
-      query.set("point_limit", "720");
+      if (dateFrom) query.set("date_from", dateFrom);
+      if (dateTo) query.set("date_to", dateTo);
+      query.set("bucket", bucket);
+      query.set("point_limit", "2000");
       query.set("device_limit", "300");
       const [trafficPayload, devicesPayload] = await Promise.all([
         api(`/traffic/summary?${query.toString()}`),
@@ -77,7 +114,7 @@ export default function TrafficGraphPage() {
     load();
     const timer = setInterval(load, 10000);
     return () => clearInterval(timer);
-  }, [plantFilter, lineFilter, deviceFilter]);
+  }, [plantFilter, lineFilter, deviceFilter, dateFrom, dateTo, bucket]);
 
   const plantOptions = useMemo(
     () => [...new Set(devices.map((device) => device.plant_name || device.plant_code).filter(Boolean))].sort(),
@@ -123,10 +160,27 @@ export default function TrafficGraphPage() {
     }
   }
 
+  function applyQuickRange(hours, nextBucket = bucket) {
+    const next = rangeHours(hours);
+    setDateFrom(next.dateFrom);
+    setDateTo(next.dateTo);
+    setBucket(nextBucket);
+  }
+
+  function resetFilters() {
+    const next = rangeHours(6);
+    setPlantFilter("");
+    setLineFilter("");
+    setDeviceFilter("");
+    setDateFrom(next.dateFrom);
+    setDateTo(next.dateTo);
+    setBucket("minute");
+  }
+
   const latest = payload?.latest || [];
   const summary = payload?.summary || {};
   const trend = (payload?.timeseries || []).map((row) => ({
-    time: timeLabel(row.time),
+    time: timeLabel(row.time, bucket),
     rx: toMbps(row.rx_bps),
     tx: toMbps(row.tx_bps),
     rxMax: toMbps(row.rx_max_bps),
@@ -168,7 +222,18 @@ export default function TrafficGraphPage() {
               <option value="">All Devices</option>
               {deviceOptions.map((device) => <option key={device.id} value={device.id}>{device.device_name} / {device.ip_address}</option>)}
             </select>
-            <button className="h-10 rounded-md border border-line bg-slate-50 px-3 text-sm font-semibold text-slate-700" onClick={() => { setPlantFilter(""); setLineFilter(""); setDeviceFilter(""); }}>
+            <input className="h-10 rounded-md border border-line px-3 text-sm" type="datetime-local" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} title={`From (${NMS_TIME_ZONE_LABEL})`} />
+            <input className="h-10 rounded-md border border-line px-3 text-sm" type="datetime-local" value={dateTo} onChange={(event) => setDateTo(event.target.value)} title={`To (${NMS_TIME_ZONE_LABEL})`} />
+            <select className="h-10 rounded-md border border-line bg-white px-3 text-sm" value={bucket} onChange={(event) => setBucket(event.target.value)}>
+              <option value="minute">Per minute</option>
+              <option value="hour">Per hour</option>
+            </select>
+            <div className="flex h-10 items-center rounded-md border border-line bg-slate-50 p-1">
+              <button className="h-8 rounded px-2 text-xs font-semibold text-slate-700 hover:bg-white" onClick={() => applyQuickRange(1, "minute")}>1H</button>
+              <button className="h-8 rounded px-2 text-xs font-semibold text-slate-700 hover:bg-white" onClick={() => applyQuickRange(6, "minute")}>6H</button>
+              <button className="h-8 rounded px-2 text-xs font-semibold text-slate-700 hover:bg-white" onClick={() => applyQuickRange(24, "hour")}>24H</button>
+            </div>
+            <button className="h-10 rounded-md border border-line bg-slate-50 px-3 text-sm font-semibold text-slate-700" onClick={resetFilters}>
               Reset
             </button>
             <button className="ml-auto inline-flex h-10 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={load} disabled={loading}>
@@ -183,10 +248,10 @@ export default function TrafficGraphPage() {
         </section>
 
         <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <KpiCard label="Current RX" value={formatBps(summary.current_rx_bps)} sublabel={`${summary.device_count || 0} devices`} />
-          <KpiCard label="Current TX" value={formatBps(summary.current_tx_bps)} sublabel={sourceText || "No source"} />
-          <KpiCard label="Peak RX" value={formatBps(rxMax || summary.max_rx_bps)} sublabel={`Min ${formatBps(rxMin)} / Avg ${formatBps(rxAvg)}`} />
-          <KpiCard label="Peak TX" value={formatBps(txMax || summary.max_tx_bps)} sublabel={`Min ${formatBps(txMin)} / Avg ${formatBps(txAvg)}`} />
+          <KpiCard label="Latest RX" value={formatBps(summary.current_rx_bps)} sublabel={`${summary.device_count || 0} devices / ${NMS_TIME_ZONE_LABEL}`} />
+          <KpiCard label="Latest TX" value={formatBps(summary.current_tx_bps)} sublabel={sourceText || "No source"} />
+          <KpiCard label="Range RX Peak" value={formatBps(rxMax || summary.range_max_rx_bps)} sublabel={`Min ${formatBps(rxMin)} / Avg ${formatBps(rxAvg || summary.range_avg_rx_bps)}`} />
+          <KpiCard label="Range TX Peak" value={formatBps(txMax || summary.range_max_tx_bps)} sublabel={`Min ${formatBps(txMin)} / Avg ${formatBps(txAvg || summary.range_avg_tx_bps)}`} />
         </div>
 
         {!latest.length ? (
@@ -200,6 +265,7 @@ export default function TrafficGraphPage() {
             <div className="mb-3 flex items-center gap-2">
               <Activity size={18} className="text-cyan-700" />
               <h2 className="font-semibold">TX / RX Traffic Trend</h2>
+              <span className="rounded border border-line bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600">{bucket === "hour" ? "Hourly" : "Per minute"}</span>
             </div>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
@@ -222,6 +288,7 @@ export default function TrafficGraphPage() {
             <div className="mb-3 flex items-center gap-2">
               <BarChart3 size={18} className="text-slate-500" />
               <h2 className="font-semibold">Top Traffic Devices</h2>
+              <span className="text-xs text-slate-500">avg in selected range</span>
             </div>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">

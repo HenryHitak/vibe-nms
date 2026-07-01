@@ -93,6 +93,12 @@ traffic
 | by_ap | AP별 Client summary |
 | traffic | TX/RX current, min, avg, max, trend, top devices |
 
+Traffic API는 별도 endpoint에서 날짜 range와 그래프 bucket을 지정할 수 있습니다.
+
+```text
+GET /api/traffic/summary?date_from=2026-06-30T08:00&date_to=2026-06-30T17:00&bucket=hour
+```
+
 ## 5. 인증 방식
 
 Display API는 읽기 전용입니다. 내부망에서만 열어 두는 경우 token 없이 쓸 수 있습니다.
