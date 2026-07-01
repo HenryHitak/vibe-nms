@@ -117,6 +117,13 @@ POST /api/traffic/observations
 
 The backend matches observations by `device_id`, `ip_address`, or `device_name`.
 
+Main dashboard layout:
+
+- Left side: full registered device list.
+- Right side: offline ping list, about 30% of desktop width.
+- Device list order: latest monitoring check or manual update first.
+- Offline ping list includes red OFFLINE/CRITICAL devices and devices with 100% packet loss.
+
 Screen timestamps use Mexico/Tijuana by default:
 
 ```text

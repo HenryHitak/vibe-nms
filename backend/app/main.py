@@ -1462,19 +1462,20 @@ def list_devices(
             SELECT d.*,
                    (SELECT COUNT(*) FROM alerts a WHERE a.device_id = d.id AND a.status = 'ACTIVE') AS active_alert_count,
                    latest.check_method AS latest_check_method,
-                   latest.error_message AS latest_monitoring_reason
+                   latest.error_message AS latest_monitoring_reason,
+                   latest.checked_at AS latest_checked_at
             FROM network_devices d
             LEFT JOIN (
-                SELECT device_id, check_method, error_message
+                SELECT device_id, check_method, error_message, checked_at
                 FROM (
-                    SELECT device_id, check_method, error_message,
+                    SELECT device_id, check_method, error_message, checked_at,
                            ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY checked_at DESC, id DESC) AS rn
                     FROM device_metrics
                 ) ranked_metrics
                 WHERE rn = 1
             ) latest ON latest.device_id = d.id
             {where}
-            ORDER BY COALESCE(d.plant_name, d.plant_code), COALESCE(d.line_name, d.line_code), d.device_name
+            ORDER BY COALESCE(latest.checked_at, d.updated_at, d.created_at) DESC, d.device_name
             """,
             params,
         ).fetchall()
@@ -1489,12 +1490,13 @@ def get_device_detail(device_id: int, actor: Actor = Depends(get_actor)) -> dict
             SELECT d.*,
                    (SELECT COUNT(*) FROM alerts a WHERE a.device_id = d.id AND a.status = 'ACTIVE') AS active_alert_count,
                    latest.check_method AS latest_check_method,
-                   latest.error_message AS latest_monitoring_reason
+                   latest.error_message AS latest_monitoring_reason,
+                   latest.checked_at AS latest_checked_at
             FROM network_devices d
             LEFT JOIN (
-                SELECT device_id, check_method, error_message
+                SELECT device_id, check_method, error_message, checked_at
                 FROM (
-                    SELECT device_id, check_method, error_message,
+                    SELECT device_id, check_method, error_message, checked_at,
                            ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY checked_at DESC, id DESC) AS rn
                     FROM device_metrics
                 ) ranked_metrics

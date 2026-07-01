@@ -96,6 +96,7 @@ function DeviceHoverPreview({ device, position }) {
             <PreviewField label="Method" value={device.latest_check_method} />
             <PreviewField label="Latency" value={device.latency_ms != null ? `${device.latency_ms} ms` : "-"} />
             <PreviewField label="ICMP Loss" value={device.packet_loss_percent != null ? `${device.packet_loss_percent}%` : "-"} />
+            <PreviewField label="Checked" value={formatTijuanaDateTime(device.latest_checked_at)} />
             <PreviewField label="Fail" value={device.consecutive_failure_count} />
             <PreviewField label="Alerts" value={device.active_alert_count} />
             <PreviewField label="Monitor" value={boolText(device.monitoring_enabled)} />
@@ -131,7 +132,7 @@ function DeviceHoverPreview({ device, position }) {
   );
 }
 
-export default function DeviceTable({ devices = [], selectedId, onSelect, actions }) {
+export default function DeviceTable({ devices = [], selectedId, onSelect, actions, className = "" }) {
   const [preview, setPreview] = useState({ device: null, position: { left: 0, top: 0 } });
 
   function showPreview(device, event) {
@@ -154,7 +155,7 @@ export default function DeviceTable({ devices = [], selectedId, onSelect, action
   }
 
   return (
-    <div className="table-scroll overflow-auto border border-line bg-white">
+    <div className={`table-scroll overflow-auto border border-line bg-white ${className}`}>
       <table className="min-w-full border-collapse text-left text-sm">
         <thead className="sticky top-0 bg-slate-100 text-xs uppercase text-slate-600">
           <tr>

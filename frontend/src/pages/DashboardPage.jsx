@@ -1,42 +1,34 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, CheckCircle2, Filter, RadioTower, ServerCrash } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { AlertTriangle, Filter, ServerCrash } from "lucide-react";
 import { api } from "../api.js";
 import AlertBanner from "../components/AlertBanner.jsx";
 import DeviceDetailModal from "../components/DeviceDetailModal.jsx";
 import DeviceTable from "../components/DeviceTable.jsx";
+import StatusBadge from "../components/StatusBadge.jsx";
+import { formatTijuanaDateTime } from "../time.js";
 
-function formatBps(value) {
-  const number = Number(value || 0);
-  if (number >= 1_000_000_000) return `${(number / 1_000_000_000).toFixed(2)} Gbps`;
-  if (number >= 1_000_000) return `${(number / 1_000_000).toFixed(2)} Mbps`;
-  if (number >= 1_000) return `${(number / 1_000).toFixed(1)} Kbps`;
-  return `${number.toFixed(0)} bps`;
+function updateStamp(device) {
+  return device.latest_checked_at || device.updated_at || device.created_at || "";
 }
 
-function Stat({ icon: Icon, label, value, tone }) {
-  const toneClass = {
-    green: "text-green-nms",
-    orange: "text-orange-nms",
-    red: "text-red-nms",
-    blue: "text-cyan-700"
-  }[tone] || "text-slate-600";
-  return (
-    <div className="rounded-md border border-line bg-white p-4 shadow-sm">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm text-slate-500">{label}</span>
-        <Icon className={toneClass} size={18} />
-      </div>
-      <div className="text-3xl font-semibold tabular-nums text-ink">{value ?? 0}</div>
-    </div>
-  );
+function compareByLatestUpdate(a, b) {
+  const byTime = String(updateStamp(b)).localeCompare(String(updateStamp(a)));
+  if (byTime !== 0) return byTime;
+  return String(a.device_name || "").localeCompare(String(b.device_name || ""));
+}
+
+function isPingOffline(device) {
+  const status = String(device.status || "UNKNOWN").toUpperCase();
+  return status === "OFFLINE" || status === "CRITICAL" || Number(device.packet_loss_percent || 0) >= 100;
+}
+
+function lossText(value) {
+  return value === null || value === undefined || value === "" ? "-" : `${value}%`;
 }
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState(null);
   const [devices, setDevices] = useState([]);
-  const [apDashboard, setApDashboard] = useState([]);
-  const [traffic, setTraffic] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailDevice, setDetailDevice] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -47,16 +39,12 @@ export default function DashboardPage() {
 
   async function load() {
     try {
-      const [summaryPayload, devicesPayload, apPayload, trafficPayload] = await Promise.all([
+      const [summaryPayload, devicesPayload] = await Promise.all([
         api("/dashboard/summary"),
-        api("/devices"),
-        api("/dashboard/by-ap"),
-        api("/traffic/summary?point_limit=120&device_limit=120")
+        api("/devices")
       ]);
       setSummary(summaryPayload);
       setDevices(devicesPayload);
-      setApDashboard(apPayload);
-      setTraffic(trafficPayload);
       setError("");
     } catch (err) {
       setError(err.message);
@@ -83,12 +71,19 @@ export default function DashboardPage() {
   );
 
   const filteredDevices = useMemo(
-    () => devices.filter((device) => {
-      const plantName = device.plant_name || device.plant_code;
-      const lineName = device.line_name || device.line_code;
-      return (!plantFilter || plantName === plantFilter) && (!lineFilter || lineName === lineFilter);
-    }),
+    () => devices
+      .filter((device) => {
+        const plantName = device.plant_name || device.plant_code;
+        const lineName = device.line_name || device.line_code;
+        return (!plantFilter || plantName === plantFilter) && (!lineFilter || lineName === lineFilter);
+      })
+      .sort(compareByLatestUpdate),
     [devices, plantFilter, lineFilter]
+  );
+
+  const offlineDevices = useMemo(
+    () => filteredDevices.filter(isPingOffline),
+    [filteredDevices]
   );
 
   useEffect(() => {
@@ -117,81 +112,6 @@ export default function DashboardPage() {
     setDetailError("");
   }
 
-  const counts = useMemo(
-    () => filteredDevices.reduce((acc, device) => {
-      acc[device.status || "UNKNOWN"] = (acc[device.status || "UNKNOWN"] || 0) + 1;
-      return acc;
-    }, {}),
-    [filteredDevices]
-  );
-
-  const plantImpact = useMemo(() => {
-    const plants = new Map();
-    for (const device of devices) {
-      const key = device.plant_name || device.plant_code || "UNKNOWN";
-      const current = plants.get(key) || {
-        plant_name: key,
-        total: 0,
-        online: 0,
-        warning: 0,
-        offline: 0,
-        lines: new Set()
-      };
-      current.total += 1;
-      current.lines.add(device.line_name || device.line_code);
-      if (device.status === "ONLINE") current.online += 1;
-      else if (["WARNING", "UNCERTAIN", "FLAPPING"].includes(device.status)) current.warning += 1;
-      else if (["OFFLINE", "CRITICAL"].includes(device.status)) current.offline += 1;
-      plants.set(key, current);
-    }
-    return [...plants.values()]
-      .map((plant) => ({ ...plant, line_count: plant.lines.size }))
-      .sort((a, b) => b.offline - a.offline || b.warning - a.warning || a.plant_name.localeCompare(b.plant_name));
-  }, [devices]);
-
-  const chartCounts = useMemo(
-    () => ["ONLINE", "WARNING", "UNCERTAIN", "FLAPPING", "OFFLINE", "CRITICAL", "UNKNOWN"].map((status) => ({ status, count: counts[status] || 0 })),
-    [counts]
-  );
-  const trend = useMemo(
-    () => [...(summary?.recent_metrics || [])]
-      .filter((row) => (!plantFilter || (row.plant_name || row.plant_code) === plantFilter) && (!lineFilter || (row.line_name || row.line_code) === lineFilter))
-      .reverse()
-      .slice(-30)
-      .map((row, index) => ({
-      index: index + 1,
-      latency: row.latency_ms ?? 0,
-      icmpLoss: row.packet_loss_percent ?? 0,
-      device: row.device_name
-    })),
-    [summary, plantFilter, lineFilter]
-  );
-
-  const trafficRows = useMemo(
-    () => [...(traffic?.latest || [])]
-      .filter((row) => (!plantFilter || row.plant_name === plantFilter) && (!lineFilter || row.line_name === lineFilter)),
-    [traffic, plantFilter, lineFilter]
-  );
-
-  const trafficOverview = useMemo(() => {
-    const totals = trafficRows.reduce((acc, row) => {
-      const rx = Number(row.rx_bps || 0);
-      const tx = Number(row.tx_bps || 0);
-      acc.rx += rx;
-      acc.tx += tx;
-      if (rx + tx > acc.peakTotal) {
-        acc.peakTotal = rx + tx;
-        acc.peakDevice = row.device_name;
-      }
-      return acc;
-    }, { rx: 0, tx: 0, peakTotal: 0, peakDevice: "-" });
-    return {
-      ...totals,
-      count: trafficRows.length,
-      source: Object.entries(traffic?.summary?.source_counts || {}).map(([source, count]) => `${source}: ${count}`).join(" / ")
-    };
-  }, [trafficRows, traffic]);
-
   return (
     <div className="flex h-full min-h-0 flex-col">
       <AlertBanner alerts={summary?.recent_alerts || []} />
@@ -214,156 +134,85 @@ export default function DashboardPage() {
             <button className="h-10 rounded-md border border-line bg-slate-50 px-3 text-sm font-semibold text-slate-700" onClick={() => { setPlantFilter(""); setLineFilter(""); }}>
               Reset
             </button>
-            <div className="ml-auto text-sm text-slate-500">{filteredDevices.length} of {devices.length} devices</div>
-          </div>
-        </section>
-
-        <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Stat icon={RadioTower} label="Devices" value={filteredDevices.length} tone="blue" />
-          <Stat icon={CheckCircle2} label="Online" value={counts.ONLINE || 0} tone="green" />
-          <Stat icon={AlertTriangle} label="Warning" value={(counts.WARNING || 0) + (counts.UNCERTAIN || 0) + (counts.FLAPPING || 0)} tone="orange" />
-          <Stat icon={ServerCrash} label="Offline / Critical" value={(counts.OFFLINE || 0) + (counts.CRITICAL || 0)} tone="red" />
-        </div>
-
-        <section className="mb-5 rounded-md border border-line bg-white p-4 shadow-sm">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Activity size={18} className="text-cyan-700" />
-              <h2 className="font-semibold">Traffic Overview</h2>
-            </div>
-            <button className="h-9 rounded-md border border-line bg-slate-50 px-3 text-sm font-semibold text-slate-700 hover:bg-white" onClick={() => { window.location.hash = "traffic"; }}>
-              Open Traffic Graphs
-            </button>
-          </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-            <div className="rounded-md border border-line bg-slate-50 p-3">
-              <div className="text-xs font-semibold uppercase text-slate-500">Current RX</div>
-              <div className="mt-1 text-xl font-semibold tabular-nums text-cyan-700">{formatBps(trafficOverview.rx)}</div>
-            </div>
-            <div className="rounded-md border border-line bg-slate-50 p-3">
-              <div className="text-xs font-semibold uppercase text-slate-500">Current TX</div>
-              <div className="mt-1 text-xl font-semibold tabular-nums text-orange-700">{formatBps(trafficOverview.tx)}</div>
-            </div>
-            <div className="rounded-md border border-line bg-slate-50 p-3">
-              <div className="text-xs font-semibold uppercase text-slate-500">Peak Device</div>
-              <div className="mt-1 truncate text-xl font-semibold text-ink">{trafficOverview.peakDevice}</div>
-            </div>
-            <div className="rounded-md border border-line bg-slate-50 p-3">
-              <div className="text-xs font-semibold uppercase text-slate-500">Traffic Source</div>
-              <div className="mt-1 truncate text-sm font-semibold text-ink">{trafficOverview.source || "No data"}</div>
-              <div className="text-xs text-slate-500">{trafficOverview.count} devices</div>
+            <div className="ml-auto text-sm text-slate-500">
+              {filteredDevices.length} devices / {offlineDevices.length} offline
             </div>
           </div>
         </section>
 
-        <section className="mb-5 rounded-md border border-line bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">Plant Impact</h2>
-            <span className="text-sm text-slate-500">{plantImpact.length} plants</span>
-          </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {plantImpact.slice(0, 8).map((plant) => (
-              <button
-                key={plant.plant_name}
-                className={`rounded-md border p-3 text-left transition-colors ${plantFilter === plant.plant_name ? "border-cyan-400 bg-cyan-50" : "border-line bg-slate-50 hover:bg-white"}`}
-                onClick={() => setPlantFilter(plant.plant_name)}
-              >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="truncate font-semibold text-ink">{plant.plant_name}</div>
-                    <div className="truncate text-xs text-slate-500">{plant.line_count} lines</div>
-                  </div>
-                  <div className={`h-3 w-3 rounded-full ${plant.offline ? "bg-red-nms" : plant.warning ? "bg-orange-nms" : "bg-green-nms"}`} />
-                </div>
-                <div className="grid grid-cols-4 gap-2 text-xs">
-                  <div><div className="font-semibold">{plant.total}</div><div className="text-slate-500">Total</div></div>
-                  <div><div className="font-semibold text-green-nms">{plant.online}</div><div className="text-slate-500">Online</div></div>
-                  <div><div className="font-semibold text-orange-nms">{plant.warning}</div><div className="text-slate-500">Warn</div></div>
-                  <div><div className="font-semibold text-red-nms">{plant.offline}</div><div className="text-slate-500">Down</div></div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="mb-5 rounded-md border border-line bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">AP Connected IPs</h2>
-            <span className="text-sm text-slate-500">{apDashboard.length} APs</span>
-          </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {apDashboard.map((item) => {
-              const ap = item.ap;
-              return (
-                <div key={ap.id} className="rounded-md border border-line bg-slate-50 p-3">
-                  <div className="mb-2 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate font-semibold text-ink">{ap.device_name}</div>
-                      <div className="truncate text-xs text-slate-500">{ap.ip_address}</div>
-                    </div>
-                    <div className="text-right text-xs text-slate-500">
-                      <div className="font-semibold text-ink">{item.connected_client_count}</div>
-                      clients
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {item.connected_ip_addresses.map((ip) => (
-                      <span key={ip} className="rounded border border-line bg-white px-1.5 py-0.5 text-xs font-semibold tabular-nums text-slate-700">{ip}</span>
-                    ))}
-                    {!item.connected_ip_addresses.length ? <span className="text-xs text-slate-500">No connected IPs discovered</span> : null}
-                  </div>
-                </div>
-              );
-            })}
-            {!apDashboard.length ? <div className="text-sm text-slate-500">No AP devices registered</div> : null}
-          </div>
-        </section>
-
-        <div className="mb-5 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.3fr]">
-          <section className="rounded-md border border-line bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center gap-2">
-              <Activity size={18} className="text-slate-500" />
-              <h2 className="font-semibold">Network State</h2>
-            </div>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartCounts}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="status" tick={{ fontSize: 11 }} />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#0f766e" radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
-
-          <section className="rounded-md border border-line bg-white p-4 shadow-sm">
-            <h2 className="mb-3 font-semibold">Recent Metrics</h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="index" tick={{ fontSize: 11 }} />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip />
-                  <Line yAxisId="left" type="monotone" dataKey="latency" stroke="#0e7490" strokeWidth={2} dot={false} />
-                  <Line yAxisId="right" type="monotone" dataKey="icmpLoss" name="ICMP Loss" stroke="#dc2626" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
-        </div>
-
-        <div className="grid min-h-[560px] grid-cols-1 gap-5">
+        <div className="grid min-h-[560px] grid-cols-1 gap-5 xl:grid-cols-[minmax(0,7fr)_minmax(320px,3fr)]">
           <section className="min-h-0">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="font-semibold">Devices</h2>
-              <span className="text-sm text-slate-500">{filteredDevices.length} active</span>
+              <span className="text-sm text-slate-500">Latest update first</span>
             </div>
-            <DeviceTable devices={filteredDevices} selectedId={detailOpen ? detailDevice?.id : null} onSelect={openDeviceDetail} />
+            <DeviceTable
+              devices={filteredDevices}
+              selectedId={detailOpen ? detailDevice?.id : null}
+              onSelect={openDeviceDetail}
+              className="h-[calc(100vh-285px)] min-h-[560px]"
+            />
           </section>
+
+          <aside className="min-h-0 rounded-md border border-red-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between gap-3 border-b border-red-100 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <ServerCrash size={18} className="text-red-nms" />
+                <h2 className="font-semibold">Offline Ping</h2>
+              </div>
+              <span className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-800">{offlineDevices.length}</span>
+            </div>
+            <div className="table-scroll h-[calc(100vh-285px)] min-h-[560px] space-y-3 overflow-auto p-3">
+              {offlineDevices.map((device) => {
+                const plantName = device.plant_name || device.plant_code || "-";
+                const lineName = device.line_name || device.line_code || "-";
+                return (
+                  <button
+                    key={device.id}
+                    className={`w-full rounded-md border p-3 text-left transition-colors hover:bg-red-50 ${detailOpen && detailDevice?.id === device.id ? "border-red-400 bg-red-50" : "border-red-200 bg-white"}`}
+                    onClick={() => openDeviceDetail(device)}
+                  >
+                    <div className="mb-2 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-ink">{device.device_name}</div>
+                        <div className="truncate text-xs tabular-nums text-slate-500">{device.ip_address}</div>
+                      </div>
+                      <StatusBadge status={device.status} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded border border-red-100 bg-red-50 px-2 py-1">
+                        <div className="font-semibold text-red-800">Loss</div>
+                        <div className="tabular-nums text-red-900">{lossText(device.packet_loss_percent)}</div>
+                      </div>
+                      <div className="rounded border border-line bg-slate-50 px-2 py-1">
+                        <div className="font-semibold text-slate-600">Failures</div>
+                        <div className="tabular-nums text-ink">{device.consecutive_failure_count ?? "-"}</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 grid grid-cols-[72px_minmax(0,1fr)] gap-x-2 gap-y-1 text-xs">
+                      <div className="text-slate-500">Plant</div>
+                      <div className="truncate font-semibold text-ink">{plantName}</div>
+                      <div className="text-slate-500">Line</div>
+                      <div className="truncate font-semibold text-ink">{lineName}</div>
+                      <div className="text-slate-500">Check</div>
+                      <div className="truncate font-semibold text-ink">{device.latest_check_method || "-"}</div>
+                      <div className="text-slate-500">Updated</div>
+                      <div className="truncate font-semibold text-ink">{formatTijuanaDateTime(updateStamp(device))}</div>
+                    </div>
+                    {device.latest_monitoring_reason ? (
+                      <div className="mt-2 flex items-start gap-1.5 rounded border border-red-100 bg-red-50 px-2 py-1.5 text-xs text-red-900">
+                        <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                        <span className="line-clamp-2">{device.latest_monitoring_reason}</span>
+                      </div>
+                    ) : null}
+                  </button>
+                );
+              })}
+              {!offlineDevices.length ? (
+                <div className="rounded-md border border-line bg-slate-50 p-4 text-sm text-slate-500">No offline ping devices</div>
+              ) : null}
+            </div>
+          </aside>
         </div>
       </div>
       <DeviceDetailModal

@@ -55,6 +55,15 @@ Do not rely on the browser for ping checks. The browser only displays data. The 
 
 If a single registered IP drops, the collector creates an ACTIVE warning alert after the first failed check, and the dashboard banner shows it on the next refresh. If multiple alerts happen in the same Plant, the banner rolls the message up to Plant-level impact.
 
+## Main Dashboard Layout
+
+The main dashboard is focused on live device operations:
+
+- Left side: full registered device list.
+- Right side: offline ping list, approximately 30% of the page width on desktop.
+- Device list order: latest monitoring check or manual update first.
+- Offline ping list includes red OFFLINE/CRITICAL devices and devices with 100% packet loss.
+
 ## AP Client Discovery
 
 The backend also runs a separate AP Client Discovery collector. It is independent from the ping monitoring worker.
