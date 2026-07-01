@@ -61,7 +61,7 @@ Do not rely on the browser for ping checks. The browser only displays data. The 
 
 If a single registered IP drops, the collector creates an ACTIVE warning alert after the first failed check, and the dashboard banner shows it on the next refresh. If multiple alerts happen in the same Plant, the banner rolls the message up to Plant-level impact.
 
-ADMIN users can open `Settings > Alarm Settings` to turn alert creation on or off by type. Disabling an alarm type stops new alerts and resolves active alerts for that type on the next collector cycle.
+ADMIN users can open `Settings > Alarm Settings` to turn alert creation on or off by type. Disabling an alarm type stops new alerts, immediately resolves active alerts for that type, and clears unread notifications tied to that type.
 
 ADMIN users can also open `Alert Center` and mute a specific alert type. Muting does not delete or resolve alerts; it only stops new dashboard notifications for that alert type until it is unmuted.
 

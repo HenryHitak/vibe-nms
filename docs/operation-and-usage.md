@@ -206,6 +206,8 @@ Traffic Graphs 화면의 `Traffic Source`에서 provider를 `generic-api`로 바
 
 `Alert Center`의 `Acknowledge`는 관리자가 확인했다는 표시이며 Alert는 계속 남습니다. `Resolve`는 Alert를 종료합니다. `Mute`는 해당 Alert type의 새 notification만 막고, Alert 기록과 상태는 그대로 유지합니다.
 
+`Settings > Alarm Settings`에서 Alert type을 OFF로 바꾸면 즉시 저장되고, 같은 type의 ACTIVE/ACKNOWLEDGED Alert와 unread notification이 바로 정리됩니다. 이 기능은 Alert 자체를 끄는 것이고, `Alert Center`의 `Mute`는 notification만 끄는 기능입니다.
+
 ## 10. Dashboard를 다른 화면에 띄우기
 
 전체 화면:

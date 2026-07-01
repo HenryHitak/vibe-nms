@@ -19,6 +19,7 @@ from .alert_settings import (
     AP_ALERT_SETTING_BY_TYPE,
     NETWORK_ALERT_SETTING_BY_TYPE,
     bool_value,
+    disabled_alert_types,
     notification_mute_key,
     notification_muted,
 )
@@ -2541,6 +2542,30 @@ def get_system_settings() -> dict[str, str]:
         return {row["key"]: row["value"] for row in rows}
 
 
+def _clear_disabled_alarm_state(conn: sqlite3.Connection, settings_values: dict[str, Any]) -> None:
+    alert_types = sorted(disabled_alert_types(settings_values))
+    if not alert_types:
+        return
+    placeholders = ", ".join(["?"] * len(alert_types))
+    conn.execute(
+        f"""
+        UPDATE alerts
+        SET status = 'RESOLVED', resolved_at = CURRENT_TIMESTAMP, last_detected_at = CURRENT_TIMESTAMP
+        WHERE alert_type IN ({placeholders}) AND status IN ('ACTIVE', 'ACKNOWLEDGED')
+        """,
+        alert_types,
+    )
+    conn.execute(
+        f"""
+        UPDATE notifications
+        SET read_at = CURRENT_TIMESTAMP
+        WHERE read_at IS NULL
+          AND alert_id IN (SELECT id FROM alerts WHERE alert_type IN ({placeholders}))
+        """,
+        alert_types,
+    )
+
+
 @app.put("/api/system-settings")
 def update_system_settings(payload: BulkSettingsPayload, actor: Actor = Depends(get_actor)) -> dict[str, str]:
     require_admin(actor)
@@ -2566,6 +2591,7 @@ def update_system_settings(payload: BulkSettingsPayload, actor: Actor = Depends(
                     (key, str(value), actor.username, actor.ip_address),
                 )
         after = {row["key"]: row["value"] for row in conn.execute("SELECT key, value FROM system_settings").fetchall()}
+        _clear_disabled_alarm_state(conn, after)
         write_audit_log(
             conn,
             actor,

@@ -73,6 +73,7 @@ export default function SystemSettingsPage() {
   const [settings, setSettings] = useState({});
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   async function load() {
     try {
@@ -92,18 +93,33 @@ export default function SystemSettingsPage() {
     setSaved(false);
   }
 
-  function toggleAlert(key) {
-    setSettings((current) => ({ ...current, [key]: enabled(current[key]) ? "false" : "true" }));
+  async function toggleAlert(key) {
+    const next = { ...settings, [key]: enabled(settings[key]) ? "false" : "true" };
+    setSettings(next);
     setSaved(false);
+    setSaving(true);
+    try {
+      setSettings(await api("/system-settings", { method: "PUT", body: JSON.stringify({ settings: next }) }));
+      setSaved(true);
+      setError("");
+    } catch (err) {
+      setError(err.message);
+      await load();
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function save() {
+    setSaving(true);
     try {
       setSettings(await api("/system-settings", { method: "PUT", body: JSON.stringify({ settings }) }));
       setSaved(true);
       setError("");
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -111,8 +127,8 @@ export default function SystemSettingsPage() {
     <AdminLayout
       title="System Settings"
       actions={
-        <button className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-3 text-sm font-semibold text-white" onClick={save}>
-          <Save size={16} /> Save
+        <button className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-3 text-sm font-semibold text-white disabled:opacity-50" disabled={saving} onClick={save}>
+          <Save size={16} /> {saving ? "Saving" : "Save"}
         </button>
       }
     >
@@ -122,7 +138,7 @@ export default function SystemSettingsPage() {
         <section className="min-w-0 rounded-md border border-line bg-white shadow-sm">
           <div className="border-b border-line px-4 py-3">
             <h2 className="font-semibold">Alarm Settings</h2>
-            <div className="text-sm text-slate-500">Turn alert creation on or off by alarm type. Disabled types resolve active alerts during the next collector cycle.</div>
+            <div className="text-sm text-slate-500">Turn alert creation on or off by alarm type. OFF resolves active alerts and clears unread notifications immediately.</div>
           </div>
           <div className="grid gap-3 p-4 2xl:grid-cols-2">
             {ALERT_SETTINGS.map((item) => {
@@ -138,7 +154,8 @@ export default function SystemSettingsPage() {
                       <div className="mt-1 text-sm leading-5 text-slate-500">{item.description}</div>
                     </div>
                     <button
-                      className={`h-8 shrink-0 rounded-md border px-3 text-xs font-semibold ${isEnabled ? "border-green-300 bg-green-50 text-green-800" : "border-slate-300 bg-slate-100 text-slate-600"}`}
+                      className={`h-8 shrink-0 rounded-md border px-3 text-xs font-semibold disabled:opacity-50 ${isEnabled ? "border-green-300 bg-green-50 text-green-800" : "border-slate-300 bg-slate-100 text-slate-600"}`}
+                      disabled={saving}
                       onClick={() => toggleAlert(item.key)}
                     >
                       {isEnabled ? "ON" : "OFF"}

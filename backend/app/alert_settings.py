@@ -37,6 +37,11 @@ AP_ALERT_SETTING_BY_TYPE = {
 }
 
 
+ALERT_TYPES_BY_SETTING = {}
+for _alert_type, _setting_key in {**NETWORK_ALERT_SETTING_BY_TYPE, **AP_ALERT_SETTING_BY_TYPE}.items():
+    ALERT_TYPES_BY_SETTING.setdefault(_setting_key, set()).add(_alert_type)
+
+
 def setting_enabled(conn: Any, key: str) -> bool:
     row = conn.execute("SELECT value FROM system_settings WHERE key = ?", (key,)).fetchone()
     value = row["value"] if row else ALERT_SETTING_DEFAULTS.get(key, "true")
@@ -65,3 +70,12 @@ def notification_mute_key(alert_type: str) -> str:
 def notification_muted(conn: Any, alert_type: str) -> bool:
     row = conn.execute("SELECT value FROM system_settings WHERE key = ?", (notification_mute_key(alert_type),)).fetchone()
     return bool_value(row["value"]) if row else False
+
+
+def disabled_alert_types(settings_values: dict[str, Any]) -> set[str]:
+    disabled: set[str] = set()
+    for key, alert_types in ALERT_TYPES_BY_SETTING.items():
+        value = settings_values.get(key, ALERT_SETTING_DEFAULTS.get(key, "true"))
+        if not bool_value(value):
+            disabled.update(alert_types)
+    return disabled
