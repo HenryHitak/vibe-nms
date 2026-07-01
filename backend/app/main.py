@@ -64,7 +64,15 @@ from .schemas import (
 from .security import Actor, actor_from_request, require_admin
 from .traffic_monitoring_worker import traffic_collection_loop, run_traffic_collection_cycle
 from .timezone import local_datetime_filter_to_utc_storage, utc_storage_to_local_label
-from .validation import VALID_CRITICALITY, VALID_DEVICE_TYPES, normalize_upper, validate_ip, validate_mac
+from .validation import (
+    VALID_CRITICALITY,
+    VALID_DEVICE_TYPES,
+    normalize_upper,
+    trim_strings,
+    trim_text,
+    validate_ip,
+    validate_mac,
+)
 
 
 collector_stop_event: asyncio.Event | None = None
@@ -191,6 +199,7 @@ def _audit_failure(actor: Actor, action_type: str, entity_type: str, error: Exce
 
 
 def _validate_device_data(data: dict[str, Any], partial: bool = False) -> dict[str, Any]:
+    data = trim_strings(data, empty_to_none=True)
     if data.get("plant_name") and not data.get("plant_code"):
         data["plant_code"] = data["plant_name"]
     if data.get("line_name") and not data.get("line_code"):
@@ -513,6 +522,7 @@ def _traffic_rollup(values: list[Any]) -> tuple[float | None, float | None, floa
 
 
 def _device_filter_clauses(filters: dict[str, Any], alias: str = "d", include_deleted_clause: bool = True) -> tuple[list[str], list[Any]]:
+    filters = trim_strings(filters, empty_to_none=True)
     clauses: list[str] = []
     params: list[Any] = []
     if include_deleted_clause:
@@ -543,6 +553,7 @@ def _traffic_bucket(value: Any, bucket: str) -> str:
 
 
 def _traffic_filter_clauses(filters: dict[str, Any]) -> tuple[list[str], list[Any]]:
+    filters = trim_strings(filters, empty_to_none=True)
     clauses, params = _device_filter_clauses(filters)
     if str(settings.traffic_default_provider or "").strip().lower().replace("_", "-") not in {"demo", "local-demo"}:
         clauses.append("LOWER(COALESCE(t.source, '')) NOT IN ('demo', 'local-demo')")
@@ -562,6 +573,7 @@ def _traffic_filter_clauses(filters: dict[str, Any]) -> tuple[list[str], list[An
 
 
 def _traffic_summary_payload(conn: sqlite3.Connection, filters: dict[str, Any]) -> dict[str, Any]:
+    filters = trim_strings(filters, empty_to_none=True)
     point_limit = min(max(int(filters.get("point_limit") or 240), 10), 2000)
     device_limit = min(max(int(filters.get("device_limit") or 200), 1), 1000)
     bucket = str(filters.get("bucket") or "minute").strip().lower()
@@ -728,6 +740,7 @@ def _traffic_summary_payload(conn: sqlite3.Connection, filters: dict[str, Any]) 
 
 
 def _dashboard_display_payload(conn: sqlite3.Connection, filters: dict[str, Any]) -> dict[str, Any]:
+    filters = trim_strings(filters, empty_to_none=True)
     device_clauses, device_params = _device_filter_clauses(filters)
     device_where = f"WHERE {' AND '.join(device_clauses)}" if device_clauses else ""
     device_limit = int(filters.get("device_limit") or 200)
@@ -1357,7 +1370,7 @@ def ingest_traffic_observations(payload: TrafficObservationIngestRequest, actor:
     errors: list[dict[str, Any]] = []
     with transaction() as conn:
         for index, observation in enumerate(payload.observations):
-            data = observation.model_dump()
+            data = trim_strings(observation.model_dump(), empty_to_none=True)
             if data.get("rx_bps") is None and data.get("tx_bps") is None:
                 skipped += 1
                 errors.append({"index": index, "error": "rx_bps or tx_bps is required"})
@@ -1449,6 +1462,10 @@ def list_devices(
     line: str | None = None,
     q: str | None = None,
 ) -> list[dict[str, Any]]:
+    status = trim_text(status, empty_to_none=True)
+    plant = trim_text(plant, empty_to_none=True)
+    line = trim_text(line, empty_to_none=True)
+    q = trim_text(q, empty_to_none=True)
     clauses = []
     params: list[Any] = []
     if not include_deleted:
@@ -1671,8 +1688,9 @@ def list_users(actor: Actor = Depends(get_actor)) -> list[dict[str, Any]]:
 @app.post("/api/users", status_code=201)
 def create_user(payload: UserCreatePayload, actor: Actor = Depends(get_actor)) -> dict[str, Any]:
     require_admin(actor)
-    role = normalize_role(payload.role)
-    username = payload.username.strip()
+    data = trim_strings(payload.model_dump(), empty_to_none=True)
+    role = normalize_role(data.get("role"))
+    username = data.get("username") or ""
     if not username:
         raise HTTPException(status_code=422, detail="Username is required")
     try:
@@ -1684,11 +1702,11 @@ def create_user(payload: UserCreatePayload, actor: Actor = Depends(get_actor)) -
                 """,
                 (
                     username,
-                    payload.display_name or username,
-                    payload.email,
+                    data.get("display_name") or username,
+                    data.get("email"),
                     role,
-                    hash_password(payload.password),
-                    1 if payload.is_active else 0,
+                    hash_password(data.get("password") or ""),
+                    1 if data.get("is_active") else 0,
                     actor.username,
                 ),
             )
@@ -1714,7 +1732,7 @@ def create_user(payload: UserCreatePayload, actor: Actor = Depends(get_actor)) -
 @app.put("/api/users/{user_id}")
 def update_user(user_id: int, payload: UserUpdatePayload, actor: Actor = Depends(get_actor)) -> dict[str, Any]:
     require_admin(actor)
-    patch = payload.model_dump(exclude_none=True)
+    patch = trim_strings(payload.model_dump(exclude_none=True), empty_to_none=True)
     if "role" in patch:
         patch["role"] = normalize_role(patch["role"])
     if "is_active" in patch:
@@ -1829,6 +1847,14 @@ def audit_logs(
     result: str | None = None,
     limit: int = Query(200, ge=1, le=1000),
 ) -> list[dict[str, Any]]:
+    date_from = trim_text(date_from, empty_to_none=True)
+    date_to = trim_text(date_to, empty_to_none=True)
+    username = trim_text(username, empty_to_none=True)
+    source_ip = trim_text(source_ip, empty_to_none=True)
+    action_type = trim_text(action_type, empty_to_none=True)
+    entity_type = trim_text(entity_type, empty_to_none=True)
+    target_ip = trim_text(target_ip, empty_to_none=True)
+    result = trim_text(result, empty_to_none=True)
     clauses = []
     params: list[Any] = []
     try:
@@ -1871,6 +1897,7 @@ def monitoring_logs(
     status: str | None = None,
     limit: int = Query(200, ge=1, le=1000),
 ) -> dict[str, Any]:
+    status = trim_text(status, empty_to_none=True)
     clauses = []
     params: list[Any] = []
     if device_id:
@@ -2222,6 +2249,7 @@ async def run_ap_client_discovery_once(actor: Actor = Depends(get_actor)) -> dic
 
 @app.get("/api/alerts/ap-client-issues")
 def ap_client_issue_alerts(status: str | None = None) -> list[dict[str, Any]]:
+    status = trim_text(status, empty_to_none=True)
     params: list[Any] = list(AP_CLIENT_ALERT_TYPES)
     placeholders = ", ".join(["?"] * len(params))
     clauses = [f"a.alert_type IN ({placeholders})"]
@@ -2249,6 +2277,7 @@ def ap_client_issue_alerts(status: str | None = None) -> list[dict[str, Any]]:
 
 @app.get("/api/alerts")
 def list_alerts(status: str | None = None) -> list[dict[str, Any]]:
+    status = trim_text(status, empty_to_none=True)
     params: list[Any] = []
     where = ""
     if status:
@@ -2387,7 +2416,7 @@ def list_notification_mutes() -> list[dict[str, Any]]:
 @app.post("/api/notification-mutes/{alert_type}")
 def set_notification_mute(alert_type: str, payload: NotificationMutePayload, actor: Actor = Depends(get_actor)) -> dict[str, Any]:
     require_admin(actor)
-    normalized_type = str(alert_type or "").upper()
+    normalized_type = str(trim_text(alert_type, empty_to_none=True) or "").upper()
     key = notification_mute_key(normalized_type)
     value = "true" if payload.muted else "false"
     with transaction() as conn:
@@ -2571,9 +2600,15 @@ def _clear_disabled_alarm_state(conn: sqlite3.Connection, settings_values: dict[
 @app.put("/api/system-settings")
 def update_system_settings(payload: BulkSettingsPayload, actor: Actor = Depends(get_actor)) -> dict[str, str]:
     require_admin(actor)
+    incoming_settings = trim_strings(payload.settings, empty_to_none=False)
     with transaction() as conn:
         before = {row["key"]: row["value"] for row in conn.execute("SELECT key, value FROM system_settings").fetchall()}
-        for key, value in payload.settings.items():
+        for raw_key, value in incoming_settings.items():
+            key = str(raw_key or "").strip()
+            if not key:
+                continue
+            if isinstance(value, str):
+                value = value.strip()
             exists = conn.execute("SELECT COUNT(*) FROM system_settings WHERE key = ?", (key,)).fetchone()[0]
             if exists:
                 conn.execute(
@@ -2725,6 +2760,7 @@ def _source_map_sections(conn: sqlite3.Connection) -> list[dict[str, Any]]:
 
 
 def _device_source_map(conn: sqlite3.Connection, device_id: int | None, ip_address: str | None) -> dict[str, Any]:
+    ip_address = trim_text(ip_address, empty_to_none=True)
     device = None
     if device_id:
         device = row_to_dict(conn.execute("SELECT * FROM network_devices WHERE id = ?", (device_id,)).fetchone())
@@ -2858,6 +2894,7 @@ def source_map(
     actor: Actor = Depends(get_actor),
 ) -> dict[str, Any]:
     require_admin(actor)
+    ip_address = trim_text(ip_address, empty_to_none=True)
     with transaction() as conn:
         device_map = _device_source_map(conn, device_id, ip_address)
         return {

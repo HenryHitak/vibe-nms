@@ -539,6 +539,7 @@ def init_db() -> None:
             )
             migrate_sqlite_users(conn)
             migrate_sqlite_network_devices(conn)
+        trim_existing_text_values(conn)
         seed_reference_data(conn)
         if settings.seed_sample_data:
             seed_sample_devices(conn)
@@ -573,6 +574,95 @@ def migrate_sqlite_network_devices(conn: sqlite3.Connection) -> None:
     for column, definition in additions.items():
         if column not in columns:
             conn.execute(f"ALTER TABLE network_devices ADD COLUMN {column} {definition}")
+
+
+def trim_existing_text_values(conn: Any) -> None:
+    table_columns: dict[str, list[str]] = {
+        "users": ["username", "display_name", "email", "role", "last_login_ip", "created_by", "updated_by"],
+        "roles": ["role_name"],
+        "network_devices": [
+            column
+            for column in DEVICE_COLUMNS
+            if column not in {"vlan", "monitoring_enabled"}
+        ]
+        + ["status", "created_by", "created_from_ip", "updated_by", "updated_from_ip", "deleted_by", "deleted_from_ip"],
+        "audit_logs": [
+            "actor_user_id",
+            "actor_username",
+            "actor_display_name",
+            "actor_role",
+            "actor_ip_address",
+            "actor_user_agent",
+            "action_type",
+            "entity_type",
+            "entity_id",
+            "target_ip_address",
+            "result",
+            "error_message",
+            "request_id",
+        ],
+        "import_jobs": ["file_name", "uploaded_by", "uploaded_from_ip", "status"],
+        "export_jobs": ["export_type", "requested_by", "requested_from_ip", "file_name"],
+        "device_metrics": ["check_method", "status", "error_message"],
+        "network_traffic_metrics": ["interface_name", "source"],
+        "alerts": ["severity", "alert_type", "message", "status", "acknowledged_by"],
+        "notifications": ["recipient_role", "title", "message", "channel"],
+        "system_settings": ["key", "value", "updated_by", "updated_from_ip"],
+        "ap_client_discovery_runs": ["status", "provider", "triggered_by", "triggered_from_ip", "error_message"],
+        "ap_client_observations": [
+            "ap_name",
+            "ap_ip_address",
+            "client_mac_address",
+            "client_ip_address",
+            "client_hostname",
+            "username",
+            "ssid",
+            "signal_quality",
+            "connection_status",
+            "source",
+        ],
+        "ap_connected_clients_current": [
+            "client_mac_address",
+            "client_ip_address",
+            "client_hostname",
+            "ssid",
+            "status",
+            "mismatch_reason",
+        ],
+    }
+    required_columns = {
+        ("users", "username"),
+        ("users", "role"),
+        ("roles", "role_name"),
+        ("network_devices", "device_name"),
+        ("network_devices", "device_type"),
+        ("network_devices", "ip_address"),
+        ("network_devices", "criticality"),
+        ("network_devices", "status"),
+        ("alerts", "severity"),
+        ("alerts", "alert_type"),
+        ("alerts", "message"),
+        ("alerts", "status"),
+        ("notifications", "recipient_role"),
+        ("notifications", "title"),
+        ("notifications", "message"),
+        ("notifications", "channel"),
+        ("system_settings", "key"),
+        ("system_settings", "value"),
+    }
+    for table, columns in table_columns.items():
+        for column in columns:
+            expression = f"TRIM({column})" if (table, column) in required_columns else f"NULLIF(TRIM({column}), '')"
+            try:
+                conn.execute(
+                    f"""
+                    UPDATE {table}
+                    SET {column} = {expression}
+                    WHERE {column} IS NOT NULL AND {column} != TRIM({column})
+                    """
+                )
+            except Exception:
+                continue
 
 
 def seed_reference_data(conn: sqlite3.Connection) -> None:

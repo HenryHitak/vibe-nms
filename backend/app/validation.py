@@ -36,6 +36,25 @@ VALID_STATUSES = {"ONLINE", "WARNING", "UNCERTAIN", "FLAPPING", "OFFLINE", "CRIT
 VALID_ALERT_STATUS = {"ACTIVE", "ACKNOWLEDGED", "RESOLVED", "SUPPRESSED"}
 
 
+def trim_text(value: Any, *, empty_to_none: bool = False) -> Any:
+    if not isinstance(value, str):
+        return value
+    text = value.strip()
+    if empty_to_none and text == "":
+        return None
+    return text
+
+
+def trim_strings(value: Any, *, empty_to_none: bool = False) -> Any:
+    if isinstance(value, dict):
+        return {key: trim_strings(item, empty_to_none=empty_to_none) for key, item in value.items()}
+    if isinstance(value, list):
+        return [trim_strings(item, empty_to_none=empty_to_none) for item in value]
+    if isinstance(value, tuple):
+        return tuple(trim_strings(item, empty_to_none=empty_to_none) for item in value)
+    return trim_text(value, empty_to_none=empty_to_none)
+
+
 def normalize_upper(value: Any) -> str:
     return str(value or "").strip().upper()
 

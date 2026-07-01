@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from .config import settings
+from .validation import trim_strings, trim_text
 
 
 def utc_now_iso() -> str:
@@ -16,6 +17,7 @@ def utc_now_iso() -> str:
 
 
 def normalize_mac(value: str | None) -> str | None:
+    value = trim_text(value, empty_to_none=True)
     if not value:
         return None
     compact = "".join(character for character in value.upper() if character.isalnum())
@@ -41,10 +43,31 @@ class APClientObservation:
     confidence: float = 0.95
     raw_data: dict[str, Any] | None = None
 
+    def __post_init__(self) -> None:
+        for field_name in (
+            "client_mac_address",
+            "client_ip_address",
+            "client_hostname",
+            "username",
+            "ssid",
+            "signal_quality",
+            "connection_status",
+            "first_seen",
+            "last_seen",
+            "source",
+        ):
+            setattr(self, field_name, trim_text(getattr(self, field_name), empty_to_none=True))
+        self.connection_status = self.connection_status or "CONNECTED"
+        self.source = self.source or "unknown"
+
     def to_db_payload(self) -> dict[str, Any]:
         payload = asdict(self)
+        for key, value in list(payload.items()):
+            if isinstance(value, str):
+                payload[key] = trim_text(value, empty_to_none=True)
         payload["client_mac_address"] = normalize_mac(payload["client_mac_address"])
-        payload["raw_data_json"] = json.dumps(payload.pop("raw_data") or {}, default=str)
+        raw_data = trim_strings(payload.pop("raw_data") or {}, empty_to_none=True)
+        payload["raw_data_json"] = json.dumps(raw_data, default=str)
         return payload
 
 
@@ -125,9 +148,9 @@ class GenericAPIAPClientProvider:
     name = "generic-api"
 
     def __init__(self, base_url: str, token: str, source: str = "generic-api"):
-        self.base_url = (base_url or "").rstrip("/")
-        self.token = token or ""
-        self.name = source
+        self.base_url = str(trim_text(base_url, empty_to_none=True) or "").rstrip("/")
+        self.token = str(trim_text(token, empty_to_none=True) or "")
+        self.name = str(trim_text(source, empty_to_none=True) or "generic-api")
 
     async def get_connected_clients(self, ap: dict[str, Any]) -> list[APClientObservation]:
         if not self.base_url or not self.token:

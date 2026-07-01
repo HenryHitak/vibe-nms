@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass
 from typing import Any, Protocol
 
 from .config import settings
+from .validation import trim_strings, trim_text
 
 
 @dataclass
@@ -20,9 +21,16 @@ class TrafficObservation:
     source: str = "demo"
     raw_data: dict[str, Any] | None = None
 
+    def __post_init__(self) -> None:
+        self.interface_name = trim_text(self.interface_name, empty_to_none=True)
+        self.source = trim_text(self.source, empty_to_none=True) or "unknown"
+
     def to_db_payload(self) -> dict[str, Any]:
         payload = asdict(self)
-        payload["raw_data_json"] = json.dumps(payload.pop("raw_data") or {}, default=str)
+        payload["interface_name"] = trim_text(payload.get("interface_name"), empty_to_none=True)
+        payload["source"] = trim_text(payload.get("source"), empty_to_none=True) or "unknown"
+        raw_data = trim_strings(payload.pop("raw_data") or {}, empty_to_none=True)
+        payload["raw_data_json"] = json.dumps(raw_data, default=str)
         return payload
 
 
@@ -67,9 +75,9 @@ class GenericAPITrafficProvider:
     name = "generic-api"
 
     def __init__(self, base_url: str, token: str, source: str = "generic-api"):
-        self.base_url = (base_url or "").rstrip("/")
-        self.token = token or ""
-        self.name = source
+        self.base_url = str(trim_text(base_url, empty_to_none=True) or "").rstrip("/")
+        self.token = str(trim_text(token, empty_to_none=True) or "")
+        self.name = str(trim_text(source, empty_to_none=True) or "generic-api")
 
     async def get_traffic(self, device: dict[str, Any]) -> TrafficObservation | None:
         if not self.base_url or not self.token:

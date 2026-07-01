@@ -11,6 +11,7 @@ Internal Network Monitoring Software for plant networks.
 - [Backend workflow](docs/backend-workflow.md)
 - [Monitoring workflow](docs/monitoring-workflow.md)
 - [Dashboard API workflow](docs/dashboard-api-workflow.md)
+- [Input normalization](docs/input-normalization.md)
 
 ## Download and Run from GitHub
 
@@ -47,6 +48,8 @@ Excel device import/export is managed from `Device Master`:
 - `Template`: download the device import template.
 - `Excel Import`: upload and preview a device workbook, then commit valid rows.
 - `Excel Export`: download the current device list as `devices.xlsx`.
+
+Text values are normalized before save and matching. Leading/trailing spaces are ignored for manual forms, Excel import, filters, external API payloads, backend collector observations, and `.env` config values. Optional fields that contain only spaces are treated as empty. See [Input normalization](docs/input-normalization.md).
 
 Device Master changes the input form by `Device Type`. Enter only confirmed information:
 

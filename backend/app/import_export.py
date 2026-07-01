@@ -17,6 +17,8 @@ from .validation import (
     ip_in_allowed_networks,
     normalize_upper,
     parse_bool,
+    trim_strings,
+    trim_text,
     validate_ip,
     validate_mac,
 )
@@ -136,6 +138,7 @@ def _normalize_excel_rows(payload: bytes) -> list[tuple[int, dict[str, Any]]]:
             for index, field in enumerate(fields)
             if field
         }
+        row = trim_strings(row, empty_to_none=True)
         if any(value not in (None, "") for value in row.values()):
             rows.append((row_index, row))
     return rows
@@ -244,6 +247,7 @@ def validate_import_rows(conn: sqlite3.Connection, payload: bytes) -> list[dict[
 
 
 def create_import_job(conn: sqlite3.Connection, file_name: str, actor: Actor, results: list[dict[str, Any]]) -> dict[str, Any]:
+    file_name = trim_text(file_name, empty_to_none=True) or "devices.xlsx"
     totals = {
         "total_rows": len(results),
         "valid_rows": sum(1 for row in results if row["validation_status"] == "VALID"),
@@ -307,7 +311,7 @@ def commit_import_job(conn: sqlite3.Connection, import_job_id: int, actor: Actor
     errors: list[str] = []
 
     for import_row in rows:
-        row_data = json.loads(import_row["row_data_json"])
+        row_data = trim_strings(json.loads(import_row["row_data_json"]), empty_to_none=True)
         try:
             device = {column: row_data.get(column) for column in DEVICE_COLUMNS}
             device["monitoring_enabled"] = 1

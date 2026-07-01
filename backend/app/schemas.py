@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class DevicePayload(BaseModel):
+class TrimmedModel(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class DevicePayload(TrimmedModel):
     plant_code: str | None = None
     plant_name: str | None = None
     building: str | None = None
@@ -34,7 +38,7 @@ class DevicePayload(BaseModel):
     notes: str | None = None
 
 
-class DevicePatch(BaseModel):
+class DevicePatch(TrimmedModel):
     plant_code: str | None = None
     plant_name: str | None = None
     building: str | None = None
@@ -63,27 +67,27 @@ class DevicePatch(BaseModel):
     notes: str | None = None
 
 
-class ImportCommitRequest(BaseModel):
+class ImportCommitRequest(TrimmedModel):
     import_job_id: int = Field(..., gt=0)
 
 
-class NotificationReadRequest(BaseModel):
+class NotificationReadRequest(TrimmedModel):
     read: bool = True
 
 
-class NotificationMutePayload(BaseModel):
+class NotificationMutePayload(TrimmedModel):
     muted: bool = True
 
 
-class SettingValue(BaseModel):
+class SettingValue(TrimmedModel):
     value: str
 
 
-class BulkSettingsPayload(BaseModel):
+class BulkSettingsPayload(TrimmedModel):
     settings: dict[str, Any]
 
 
-class DatabaseConfigPayload(BaseModel):
+class DatabaseConfigPayload(TrimmedModel):
     database_engine: str = "mssql"
     database_path: str | None = None
     mssql_server: str = "localhost\\SQLEXPRESS"
@@ -97,7 +101,7 @@ class DatabaseConfigPayload(BaseModel):
     mssql_trust_server_certificate: bool = True
 
 
-class DisplayDashboardRequest(BaseModel):
+class DisplayDashboardRequest(TrimmedModel):
     plant: str | None = None
     line: str | None = None
     status: str | None = None
@@ -107,7 +111,7 @@ class DisplayDashboardRequest(BaseModel):
     include_ap: bool = True
 
 
-class TrafficConfigPayload(BaseModel):
+class TrafficConfigPayload(TrimmedModel):
     traffic_collection_enabled: bool = True
     traffic_collection_interval_seconds: int = Field(60, ge=10, le=3600)
     traffic_default_provider: str = "not-configured"
@@ -118,7 +122,7 @@ class TrafficConfigPayload(BaseModel):
     generic_snmp_community: str | None = None
 
 
-class TrafficObservationPayload(BaseModel):
+class TrafficObservationPayload(TrimmedModel):
     device_id: int | None = None
     ip_address: str | None = None
     device_name: str | None = None
@@ -131,11 +135,11 @@ class TrafficObservationPayload(BaseModel):
     raw_data: dict[str, Any] | None = None
 
 
-class TrafficObservationIngestRequest(BaseModel):
+class TrafficObservationIngestRequest(TrimmedModel):
     observations: list[TrafficObservationPayload] = Field(..., min_length=1, max_length=500)
 
 
-class APClientRegistrationPayload(BaseModel):
+class APClientRegistrationPayload(TrimmedModel):
     device_name: str
     device_type: str = "OTHER"
     ip_address: str
@@ -148,7 +152,7 @@ class APClientRegistrationPayload(BaseModel):
     notes: str | None = None
 
 
-class APClientRegistrationPatch(BaseModel):
+class APClientRegistrationPatch(TrimmedModel):
     device_name: str | None = None
     device_type: str | None = None
     ip_address: str | None = None
@@ -161,12 +165,12 @@ class APClientRegistrationPatch(BaseModel):
     notes: str | None = None
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(TrimmedModel):
     username: str
     password: str
 
 
-class UserCreatePayload(BaseModel):
+class UserCreatePayload(TrimmedModel):
     username: str
     password: str = Field(..., min_length=4)
     display_name: str | None = None
@@ -175,12 +179,12 @@ class UserCreatePayload(BaseModel):
     is_active: bool = True
 
 
-class UserUpdatePayload(BaseModel):
+class UserUpdatePayload(TrimmedModel):
     display_name: str | None = None
     email: str | None = None
     role: str | None = None
     is_active: bool | None = None
 
 
-class PasswordResetPayload(BaseModel):
+class PasswordResetPayload(TrimmedModel):
     password: str = Field(..., min_length=4)
