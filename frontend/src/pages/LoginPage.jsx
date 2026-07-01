@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { LogIn, MonitorCog } from "lucide-react";
 import { login } from "../api.js";
+import { useI18n } from "../i18n.jsx";
 
 export default function LoginPage({ onLogin }) {
+  const { t } = useI18n();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -30,20 +32,20 @@ export default function LoginPage({ onLogin }) {
           </div>
           <div>
             <h1 className="text-xl font-semibold text-ink">Vibe NMS</h1>
-            <p className="text-sm text-slate-500">Network Monitoring Login</p>
+            <p className="text-sm text-slate-500">{t("login.subtitle")}</p>
           </div>
         </div>
         {error ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
         <label className="mb-3 block text-sm">
-          <span className="mb-1 block text-slate-600">Username</span>
+          <span className="mb-1 block text-slate-600">{t("login.username")}</span>
           <input className="h-10 w-full rounded-md border border-line px-3" value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" />
         </label>
         <label className="mb-5 block text-sm">
-          <span className="mb-1 block text-slate-600">Password</span>
+          <span className="mb-1 block text-slate-600">{t("login.password")}</span>
           <input className="h-10 w-full rounded-md border border-line px-3" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" />
         </label>
         <button className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-ink px-3 text-sm font-semibold text-white disabled:opacity-60" disabled={busy}>
-          <LogIn size={16} /> Login
+          <LogIn size={16} /> {t("login.submit")}
         </button>
       </form>
     </main>

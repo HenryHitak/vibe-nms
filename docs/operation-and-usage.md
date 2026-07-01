@@ -79,6 +79,8 @@ Start-ScheduledTask -TaskName VibeNMS
 
 관리 화면은 공통 레이아웃에서 페이지 내부 스크롤을 제공합니다. `Settings`, `Device Master`, `User Accounts`, `Audit Logs`, `Monitoring Logs`, `DB Config`, `Backend Info`, `Alert Center`처럼 내용이 긴 탭은 헤더와 메뉴를 유지한 상태로 본문만 스크롤해서 봅니다.
 
+UI 언어는 `Settings > Language Settings`에서 변경합니다. 기본값은 영어이며, English, 한국어, Español을 지원합니다. 선택값은 현재 브라우저에 저장되고 즉시 적용됩니다.
+
 ## 5. 장치 등록
 
 `Device Master`에서 장치를 등록합니다.

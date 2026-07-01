@@ -72,6 +72,8 @@ ADMIN users can open `Settings > Alarm Settings` to turn alert creation on or of
 
 ADMIN users can also open `Alert Center` and mute a specific alert type. Muting does not delete or resolve alerts; it only stops new dashboard notifications for that alert type until it is unmuted.
 
+UI language is controlled from `Settings > Language Settings`. The default language is English, and the available browser UI languages are English, Korean, and Spanish. The selection is saved in the browser.
+
 ## Main Dashboard Layout
 
 The main dashboard is focused on live device operations:

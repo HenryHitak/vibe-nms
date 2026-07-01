@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Bell, BellOff, Save } from "lucide-react";
 import { api } from "../api.js";
 import AdminLayout from "../components/AdminLayout.jsx";
+import { SUPPORTED_LANGUAGES, useI18n } from "../i18n.jsx";
 
 const KNOWN_KEYS = [
   "monitoring_interval_seconds",
@@ -15,53 +16,53 @@ const KNOWN_KEYS = [
 const ALERT_SETTINGS = [
   {
     key: "alert_network_warning_enabled",
-    label: "Network warning",
-    description: "Ping failure before OFFLINE, warning latency, or warning state alerts."
+    labelKey: "alerts.networkWarning",
+    descriptionKey: "alerts.networkWarningDescription"
   },
   {
     key: "alert_network_offline_enabled",
-    label: "Network offline / critical",
-    description: "OFFLINE and CRITICAL ping status alerts."
+    labelKey: "alerts.networkOffline",
+    descriptionKey: "alerts.networkOfflineDescription"
   },
   {
     key: "alert_network_packet_loss_enabled",
-    label: "Packet loss",
-    description: "Alerts when packet loss is above the configured warning threshold."
+    labelKey: "alerts.packetLoss",
+    descriptionKey: "alerts.packetLossDescription"
   },
   {
     key: "alert_network_latency_enabled",
-    label: "Latency",
-    description: "Alerts when ping latency is above warning or critical thresholds."
+    labelKey: "alerts.latency",
+    descriptionKey: "alerts.latencyDescription"
   },
   {
     key: "alert_network_flapping_enabled",
-    label: "Flapping",
-    description: "Alerts when a device repeatedly changes between up and down states."
+    labelKey: "alerts.flapping",
+    descriptionKey: "alerts.flappingDescription"
   },
   {
     key: "alert_ap_unknown_client_enabled",
-    label: "AP unknown client",
-    description: "Alerts for wireless clients not registered in Device Master."
+    labelKey: "alerts.apUnknownClient",
+    descriptionKey: "alerts.apUnknownClientDescription"
   },
   {
     key: "alert_ap_wrong_ap_enabled",
-    label: "AP wrong connection",
-    description: "Alerts when a known client appears on a different AP than expected."
+    labelKey: "alerts.apWrongConnection",
+    descriptionKey: "alerts.apWrongConnectionDescription"
   },
   {
     key: "alert_ap_duplicate_ip_enabled",
-    label: "AP duplicate IP",
-    description: "Alerts when AP discovery sees duplicate client IP addresses."
+    labelKey: "alerts.apDuplicateIp",
+    descriptionKey: "alerts.apDuplicateIpDescription"
   },
   {
     key: "alert_ap_critical_missing_enabled",
-    label: "AP critical missing",
-    description: "Alerts when a critical expected wireless device is missing."
+    labelKey: "alerts.apCriticalMissing",
+    descriptionKey: "alerts.apCriticalMissingDescription"
   },
   {
     key: "alert_ap_client_count_drop_enabled",
-    label: "AP client count drop",
-    description: "Alerts when an AP client count drops sharply."
+    labelKey: "alerts.apClientCountDrop",
+    descriptionKey: "alerts.apClientCountDropDescription"
   }
 ];
 
@@ -70,6 +71,7 @@ function enabled(value) {
 }
 
 export default function SystemSettingsPage() {
+  const { language, setLanguage, t } = useI18n();
   const [settings, setSettings] = useState({});
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -125,20 +127,42 @@ export default function SystemSettingsPage() {
 
   return (
     <AdminLayout
-      title="System Settings"
+      title={t("settings.title")}
       actions={
         <button className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-3 text-sm font-semibold text-white disabled:opacity-50" disabled={saving} onClick={save}>
-          <Save size={16} /> {saving ? "Saving" : "Save"}
+          <Save size={16} /> {saving ? t("common.saving") : t("common.save")}
         </button>
       }
     >
       {error ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
-      {saved ? <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-900">Saved</div> : null}
+      {saved ? <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-900">{t("common.saved")}</div> : null}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="min-w-0 rounded-md border border-line bg-white shadow-sm xl:col-span-2">
+          <div className="border-b border-line px-4 py-3">
+            <h2 className="font-semibold">{t("settings.languageTitle")}</h2>
+            <div className="text-sm text-slate-500">{t("settings.languageDescription")}</div>
+          </div>
+          <div className="grid gap-3 p-4 md:grid-cols-[minmax(240px,360px)_1fr]">
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-slate-700">{t("settings.uiLanguage")}</span>
+              <select
+                className="h-10 w-full rounded-md border border-line bg-white px-3"
+                value={language}
+                onChange={(event) => setLanguage(event.target.value)}
+              >
+                {SUPPORTED_LANGUAGES.map((item) => (
+                  <option key={item.code} value={item.code}>{item.label}</option>
+                ))}
+              </select>
+            </label>
+            <div className="flex items-end text-sm text-slate-500">{t("settings.languageHelp")}</div>
+          </div>
+        </section>
+
         <section className="min-w-0 rounded-md border border-line bg-white shadow-sm">
           <div className="border-b border-line px-4 py-3">
-            <h2 className="font-semibold">Alarm Settings</h2>
-            <div className="text-sm text-slate-500">Turn alert creation on or off by alarm type. OFF resolves active alerts and clears unread notifications immediately.</div>
+            <h2 className="font-semibold">{t("settings.alarmTitle")}</h2>
+            <div className="text-sm text-slate-500">{t("settings.alarmDescription")}</div>
           </div>
           <div className="grid gap-3 p-4 2xl:grid-cols-2">
             {ALERT_SETTINGS.map((item) => {
@@ -149,9 +173,9 @@ export default function SystemSettingsPage() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 font-semibold text-ink">
                         {isEnabled ? <Bell size={16} className="shrink-0 text-green-nms" /> : <BellOff size={16} className="shrink-0 text-slate-500" />}
-                        <span className="truncate">{item.label}</span>
+                        <span className="truncate">{t(item.labelKey)}</span>
                       </div>
-                      <div className="mt-1 text-sm leading-5 text-slate-500">{item.description}</div>
+                      <div className="mt-1 text-sm leading-5 text-slate-500">{t(item.descriptionKey)}</div>
                     </div>
                     <button
                       className={`h-8 shrink-0 rounded-md border px-3 text-xs font-semibold disabled:opacity-50 ${isEnabled ? "border-green-300 bg-green-50 text-green-800" : "border-slate-300 bg-slate-100 text-slate-600"}`}
@@ -169,7 +193,7 @@ export default function SystemSettingsPage() {
 
         <section className="min-w-0 rounded-md border border-line bg-white shadow-sm">
           <div className="border-b border-line px-4 py-3">
-            <h2 className="font-semibold">Monitoring Settings</h2>
+            <h2 className="font-semibold">{t("settings.monitoringTitle")}</h2>
           </div>
           {KNOWN_KEYS.map((key) => (
             <label key={key} className="block border-b border-line p-4 text-sm last:border-b-0">

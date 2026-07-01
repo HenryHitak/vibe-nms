@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Bell, ExternalLink, X } from "lucide-react";
 import { formatTijuanaDateTime } from "../time.js";
+import { useI18n } from "../i18n.jsx";
 
 export default function AlertBell({ count = 0, notifications = [], onDismiss, onViewAlerts }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
 
@@ -36,7 +38,7 @@ export default function AlertBell({ count = 0, notifications = [], onDismiss, on
     <div className="relative" ref={rootRef}>
       <button
         className="relative inline-flex h-10 w-10 items-center justify-center rounded-md border border-line bg-white text-ink shadow-sm hover:bg-slate-50"
-        title="Notifications"
+        title={t("notifications.title")}
         onClick={() => setOpen((value) => !value)}
       >
         <Bell size={18} />
@@ -51,10 +53,10 @@ export default function AlertBell({ count = 0, notifications = [], onDismiss, on
         <div className="absolute right-0 top-12 z-50 w-[min(380px,calc(100vw-32px))] overflow-hidden rounded-md border border-line bg-white text-left shadow-xl">
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <div>
-              <div className="font-semibold text-ink">Notifications</div>
-              <div className="text-xs text-slate-500">{notifications.length} unread</div>
+              <div className="font-semibold text-ink">{t("notifications.title")}</div>
+              <div className="text-xs text-slate-500">{notifications.length} {t("notifications.unread")}</div>
             </div>
-            <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white hover:bg-slate-50" title="Alert Center" onClick={viewAlerts}>
+            <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white hover:bg-slate-50" title={t("routes.alerts")} onClick={viewAlerts}>
               <ExternalLink size={15} />
             </button>
           </div>
@@ -70,7 +72,7 @@ export default function AlertBell({ count = 0, notifications = [], onDismiss, on
                   </div>
                   <button
                     className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-line bg-white text-slate-600 hover:bg-slate-50"
-                    title="Mark as read"
+                    title={t("notifications.markAsRead")}
                     onClick={() => onDismiss?.(notification.id)}
                   >
                     <X size={14} />
@@ -78,7 +80,7 @@ export default function AlertBell({ count = 0, notifications = [], onDismiss, on
                 </div>
               </div>
             )) : (
-              <div className="px-4 py-8 text-center text-sm text-slate-500">No unread notifications</div>
+              <div className="px-4 py-8 text-center text-sm text-slate-500">{t("notifications.noUnread")}</div>
             )}
           </div>
 
@@ -86,7 +88,7 @@ export default function AlertBell({ count = 0, notifications = [], onDismiss, on
             className="flex h-10 w-full items-center justify-center gap-2 border-t border-line bg-slate-50 text-sm font-semibold text-slate-700 hover:bg-white"
             onClick={viewAlerts}
           >
-            Open Alert Center <ExternalLink size={14} />
+            {t("notifications.openAlertCenter")} <ExternalLink size={14} />
           </button>
         </div>
       ) : null}

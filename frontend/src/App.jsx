@@ -33,15 +33,16 @@ import MonitoringLogPage from "./pages/MonitoringLogPage.jsx";
 import SystemSettingsPage from "./pages/SystemSettingsPage.jsx";
 import TrafficGraphPage from "./pages/TrafficGraphPage.jsx";
 import UserAdminPage from "./pages/UserAdminPage.jsx";
+import { useI18n } from "./i18n.jsx";
 
 const ADMIN_ROUTES = [
-  { key: "users", label: "User Accounts", icon: UserRound, page: UserAdminPage },
-  { key: "devices", label: "Device Master", icon: Server, page: DeviceAdminPage },
-  { key: "audit", label: "Audit Logs", icon: History, page: AuditLogPage },
-  { key: "monitoring", label: "Monitoring Logs", icon: ListChecks, page: MonitoringLogPage },
-  { key: "database", label: "DB Config", icon: Database, page: DatabaseConfigPage },
-  { key: "backend", label: "Backend Info", icon: Server, page: BackendInfoPage },
-  { key: "settings", label: "Settings", icon: Settings, page: SystemSettingsPage }
+  { key: "users", labelKey: "routes.users", icon: UserRound, page: UserAdminPage },
+  { key: "devices", labelKey: "routes.devices", icon: Server, page: DeviceAdminPage },
+  { key: "audit", labelKey: "routes.audit", icon: History, page: AuditLogPage },
+  { key: "monitoring", labelKey: "routes.monitoring", icon: ListChecks, page: MonitoringLogPage },
+  { key: "database", labelKey: "routes.database", icon: Database, page: DatabaseConfigPage },
+  { key: "backend", labelKey: "routes.backend", icon: Server, page: BackendInfoPage },
+  { key: "settings", labelKey: "routes.settings", icon: Settings, page: SystemSettingsPage }
 ];
 
 function routeFromHash() {
@@ -54,6 +55,7 @@ function normalizeRole(value) {
 }
 
 function AuthenticatedApp() {
+  const { t } = useI18n();
   const [route, setRoute] = useState(routeFromHash);
   const [user, setUser] = useState(getStoredUser());
   const [summary, setSummary] = useState(null);
@@ -65,13 +67,13 @@ function AuthenticatedApp() {
 
   const routes = useMemo(() => {
     const base = [
-      { key: "dashboard", label: "Dashboard", icon: Gauge, page: DashboardPage },
-      { key: "traffic", label: "Traffic Graphs", icon: Activity, page: TrafficGraphPage },
-      { key: "alerts", label: "Alert Center", icon: BellRing, page: AlertCenter },
-      { key: "ap-clients", label: "AP Clients", icon: Wifi, page: APClientDiscoveryPage }
+      { key: "dashboard", labelKey: "routes.dashboard", icon: Gauge, page: DashboardPage },
+      { key: "traffic", labelKey: "routes.traffic", icon: Activity, page: TrafficGraphPage },
+      { key: "alerts", labelKey: "routes.alerts", icon: BellRing, page: AlertCenter },
+      { key: "ap-clients", labelKey: "routes.apClients", icon: Wifi, page: APClientDiscoveryPage }
     ];
-    return role === "ADMIN" ? [...base, ...ADMIN_ROUTES] : base;
-  }, [role]);
+    return (role === "ADMIN" ? [...base, ...ADMIN_ROUTES] : base).map((item) => ({ ...item, label: t(item.labelKey) }));
+  }, [role, t]);
 
   const ActivePage = (routes.find((item) => item.key === route) || routes[0]).page;
 
@@ -186,15 +188,15 @@ function AuthenticatedApp() {
           </div>
           {!sidebarCollapsed ? <div>
             <div className="font-semibold">Vibe NMS</div>
-            <div className="text-xs text-slate-500">Internal Network Monitoring</div>
+            <div className="text-xs text-slate-500">{t("app.subtitle")}</div>
           </div> : null}
         </div>
         <button
           className={`mb-4 hidden h-9 w-full items-center rounded-md border border-line bg-white px-3 text-sm text-slate-700 hover:bg-slate-50 md:flex ${sidebarCollapsed ? "justify-center px-0" : "justify-between"}`}
           onClick={() => setSidebarCollapsed((value) => !value)}
-          title={sidebarCollapsed ? "Expand menu" : "Collapse menu"}
+          title={sidebarCollapsed ? t("app.expandMenu") : t("app.collapseMenu")}
         >
-          {!sidebarCollapsed ? <span>Menu</span> : null}
+          {!sidebarCollapsed ? <span>{t("app.menu")}</span> : null}
           {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
         </button>
         <nav className="space-y-1">
@@ -203,10 +205,10 @@ function AuthenticatedApp() {
         {role === "ADMIN" ? (
           <>
             <div className={`mb-2 mt-6 flex items-center gap-2 px-3 text-xs font-semibold uppercase text-slate-500 ${sidebarCollapsed ? "justify-center px-0" : ""}`}>
-              <Shield size={14} /> {!sidebarCollapsed ? "Admin" : null}
+              <Shield size={14} /> {!sidebarCollapsed ? t("app.admin") : null}
             </div>
             <nav className="space-y-1">
-              {ADMIN_ROUTES.map(navButton)}
+              {routes.slice(4).map(navButton)}
             </nav>
           </>
         ) : null}
@@ -219,8 +221,8 @@ function AuthenticatedApp() {
               <Menu size={18} />
             </button>
             <div className="min-w-0">
-              <div className="truncate text-sm text-slate-500">Operations Console</div>
-              <div className="truncate text-lg font-semibold">{routes.find((item) => item.key === route)?.label || "Dashboard"}</div>
+              <div className="truncate text-sm text-slate-500">{t("app.operationsConsole")}</div>
+              <div className="truncate text-lg font-semibold">{routes.find((item) => item.key === route)?.label || t("routes.dashboard")}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -234,7 +236,7 @@ function AuthenticatedApp() {
               onDismiss={dismissToast}
               onViewAlerts={() => setRoute("alerts")}
             />
-            <button className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-line bg-white" title="Logout" onClick={logout}>
+            <button className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-line bg-white" title={t("app.logout")} onClick={logout}>
               <LogOut size={17} />
             </button>
           </div>
@@ -251,7 +253,7 @@ function AuthenticatedApp() {
                 <div className="font-semibold text-ink">{toast.title}</div>
                 <div className="mt-1 text-sm text-slate-600">{toast.message}</div>
               </div>
-              <button className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-line" title="Dismiss" onClick={() => dismissToast(toast.id)}>
+              <button className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-line" title={t("common.dismiss")} onClick={() => dismissToast(toast.id)}>
                 <X size={14} />
               </button>
             </div>
