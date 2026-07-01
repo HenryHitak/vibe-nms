@@ -11,6 +11,7 @@ mkdir -p "$RELEASE_DIR"
 cp -R "$ROOT_DIR/backend" "$RELEASE_DIR/backend"
 cp -R "$ROOT_DIR/frontend" "$RELEASE_DIR/frontend"
 cp -R "$ROOT_DIR/nginx" "$RELEASE_DIR/nginx"
+cp -R "$ROOT_DIR/docs" "$RELEASE_DIR/docs"
 rm -rf "$RELEASE_DIR/frontend/node_modules" "$RELEASE_DIR/frontend/dist" "$RELEASE_DIR/frontend/.vite"
 find "$RELEASE_DIR" -type d -name "__pycache__" -prune -exec rm -rf {} +
 cp "$ROOT_DIR/docker-compose.yml" "$RELEASE_DIR/docker-compose.yml"

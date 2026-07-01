@@ -77,6 +77,8 @@ Start-ScheduledTask -TaskName VibeNMS
 
 현재 백엔드와 DB 상태는 `Backend Info` 화면에서 확인합니다.
 
+관리 화면은 공통 레이아웃에서 페이지 내부 스크롤을 제공합니다. `Settings`, `Device Master`, `User Accounts`, `Audit Logs`, `Monitoring Logs`, `DB Config`, `Backend Info`, `Alert Center`처럼 내용이 긴 탭은 헤더와 메뉴를 유지한 상태로 본문만 스크롤해서 봅니다.
+
 ## 5. 장치 등록
 
 `Device Master`에서 장치를 등록합니다.

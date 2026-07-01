@@ -179,7 +179,7 @@ function AuthenticatedApp() {
 
   return (
     <div className="flex h-screen min-h-0 bg-slate-100 text-ink">
-      <aside className={`${mobileOpen ? "fixed inset-y-0 left-0 z-40 block w-72" : "hidden"} border-r border-line bg-white p-4 shadow-sm transition-[width] duration-200 md:block ${sidebarCollapsed ? "md:w-20" : "md:w-72"}`}>
+      <aside className={`${mobileOpen ? "fixed inset-y-0 left-0 z-40 block w-72" : "hidden"} border-r border-line bg-white p-4 shadow-sm transition-[width] duration-200 md:block ${sidebarCollapsed ? "md:w-20" : "md:w-72"} overflow-y-auto`}>
         <div className={`mb-6 flex items-center ${sidebarCollapsed ? "justify-center" : "gap-3"}`}>
           <div className="flex h-10 w-10 items-center justify-center rounded-md bg-ink text-white">
             <MonitorCog size={22} />

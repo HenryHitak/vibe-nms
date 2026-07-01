@@ -25,6 +25,7 @@ function Copy-CleanDirectory($source, $destination, $excludedNames) {
 Copy-CleanDirectory (Join-Path $root "backend") (Join-Path $releaseDir "backend") @("__pycache__", ".pytest_cache")
 Copy-CleanDirectory (Join-Path $root "frontend") (Join-Path $releaseDir "frontend") @("node_modules", "dist", ".vite")
 Copy-CleanDirectory (Join-Path $root "nginx") (Join-Path $releaseDir "nginx") @()
+Copy-CleanDirectory (Join-Path $root "docs") (Join-Path $releaseDir "docs") @()
 
 Get-ChildItem -LiteralPath $releaseDir -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force
 

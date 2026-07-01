@@ -296,6 +296,7 @@ This package contains:
 - Login with ADMIN / USER roles
 - Admin user account creation, disable, and password reset
 - React dashboard/admin UI with green, orange, red, and gray device states
+- Shared admin layout scrolling so Settings, logs, tables, and forms remain readable on smaller screens
 - Docker Compose packaging for internal server deployment
 - Windows installer package build script for non-Docker deployment
 

@@ -118,46 +118,50 @@ export default function SystemSettingsPage() {
     >
       {error ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
       {saved ? <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-900">Saved</div> : null}
-      <section className="mb-5 max-w-5xl rounded-md border border-line bg-white shadow-sm">
-        <div className="border-b border-line px-4 py-3">
-          <h2 className="font-semibold">Alarm Settings</h2>
-          <div className="text-sm text-slate-500">Turn alert creation on or off by alarm type. Existing active alerts for a disabled type are resolved during the next collector cycle.</div>
-        </div>
-        <div className="divide-y divide-line">
-          {ALERT_SETTINGS.map((item) => {
-            const isEnabled = enabled(settings[item.key]);
-            return (
-              <div key={item.key} className="grid grid-cols-1 gap-3 p-4 md:grid-cols-[1fr_150px] md:items-center">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 font-semibold text-ink">
-                    {isEnabled ? <Bell size={16} className="text-green-nms" /> : <BellOff size={16} className="text-slate-500" />}
-                    {item.label}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="min-w-0 rounded-md border border-line bg-white shadow-sm">
+          <div className="border-b border-line px-4 py-3">
+            <h2 className="font-semibold">Alarm Settings</h2>
+            <div className="text-sm text-slate-500">Turn alert creation on or off by alarm type. Disabled types resolve active alerts during the next collector cycle.</div>
+          </div>
+          <div className="grid gap-3 p-4 2xl:grid-cols-2">
+            {ALERT_SETTINGS.map((item) => {
+              const isEnabled = enabled(settings[item.key]);
+              return (
+                <div key={item.key} className="min-w-0 rounded-md border border-line bg-slate-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 font-semibold text-ink">
+                        {isEnabled ? <Bell size={16} className="shrink-0 text-green-nms" /> : <BellOff size={16} className="shrink-0 text-slate-500" />}
+                        <span className="truncate">{item.label}</span>
+                      </div>
+                      <div className="mt-1 text-sm leading-5 text-slate-500">{item.description}</div>
+                    </div>
+                    <button
+                      className={`h-8 shrink-0 rounded-md border px-3 text-xs font-semibold ${isEnabled ? "border-green-300 bg-green-50 text-green-800" : "border-slate-300 bg-slate-100 text-slate-600"}`}
+                      onClick={() => toggleAlert(item.key)}
+                    >
+                      {isEnabled ? "ON" : "OFF"}
+                    </button>
                   </div>
-                  <div className="mt-1 text-sm text-slate-500">{item.description}</div>
                 </div>
-                <button
-                  className={`h-10 rounded-md border px-3 text-sm font-semibold ${isEnabled ? "border-green-300 bg-green-50 text-green-800" : "border-slate-300 bg-slate-100 text-slate-600"}`}
-                  onClick={() => toggleAlert(item.key)}
-                >
-                  {isEnabled ? "ON" : "OFF"}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+              );
+            })}
+          </div>
+        </section>
 
-      <section className="max-w-3xl rounded-md border border-line bg-white shadow-sm">
-        <div className="border-b border-line px-4 py-3">
-          <h2 className="font-semibold">Monitoring Settings</h2>
-        </div>
-        {KNOWN_KEYS.map((key) => (
-          <label key={key} className="grid grid-cols-1 gap-2 border-b border-line p-4 text-sm last:border-b-0 md:grid-cols-[240px_1fr]">
-            <span className="font-medium text-slate-700">{key}</span>
-            <input className="h-10 rounded-md border border-line px-3" value={settings[key] || ""} onChange={(event) => change(key, event.target.value)} />
-          </label>
-        ))}
-      </section>
+        <section className="min-w-0 rounded-md border border-line bg-white shadow-sm">
+          <div className="border-b border-line px-4 py-3">
+            <h2 className="font-semibold">Monitoring Settings</h2>
+          </div>
+          {KNOWN_KEYS.map((key) => (
+            <label key={key} className="block border-b border-line p-4 text-sm last:border-b-0">
+              <span className="mb-1 block break-words font-medium text-slate-700">{key}</span>
+              <input className="h-10 w-full rounded-md border border-line px-3" value={settings[key] || ""} onChange={(event) => change(key, event.target.value)} />
+            </label>
+          ))}
+        </section>
+      </div>
     </AdminLayout>
   );
 }
