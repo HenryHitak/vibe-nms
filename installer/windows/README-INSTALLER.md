@@ -101,17 +101,17 @@ Traffic Graphs:
 ```text
 NMS_TRAFFIC_COLLECTION_ENABLED=true
 NMS_TRAFFIC_COLLECTION_INTERVAL_SECONDS=60
-NMS_TRAFFIC_DEFAULT_PROVIDER=demo
+NMS_TRAFFIC_DEFAULT_PROVIDER=not-configured
 NMS_TRAFFIC_GENERIC_API_URL=
 NMS_TRAFFIC_GENERIC_API_TOKEN=
 NMS_SEED_SAMPLE_DATA=false
 ```
 
-`Traffic Graphs` shows TX/RX current, min, avg, max, trend, and top traffic devices. The default `demo` provider is for UI validation. For production, connect a controller/SNMP/API collector and keep API tokens in backend `.env` only.
+`Traffic Graphs` shows TX/RX current, min, avg, max, trend, and top traffic devices. The default provider is `not-configured`, so fake demo traffic is not generated. For production, connect a controller/SNMP/API collector or push real observations to `POST /api/traffic/observations`, and keep API tokens in backend `.env` only.
 
 The top KPI cards show `Current RX`, `RX Min`, `RX Avg`, `RX Max`, `Current TX`, `TX Min`, `TX Avg`, and `TX Max` separately for the selected date range.
 
-New production installs set `NMS_SEED_SAMPLE_DATA=false`; the dashboard starts from devices you import or create. Reinstalling the package preserves existing traffic source settings instead of resetting the provider back to demo.
+New production installs set `NMS_SEED_SAMPLE_DATA=false`; the dashboard starts from devices you import or create. Reinstalling the package preserves existing traffic source settings.
 
 Traffic graphs support date range filtering and per-minute/per-hour buckets. Date filters use the Mexico/Tijuana time base:
 

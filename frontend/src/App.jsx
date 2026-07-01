@@ -30,6 +30,7 @@ import DeviceAdminPage from "./pages/DeviceAdminPage.jsx";
 import DisplayDashboardPage from "./pages/DisplayDashboardPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import MonitoringLogPage from "./pages/MonitoringLogPage.jsx";
+import SourceMapModal from "./components/SourceMapModal.jsx";
 import SystemSettingsPage from "./pages/SystemSettingsPage.jsx";
 import TrafficGraphPage from "./pages/TrafficGraphPage.jsx";
 import UserAdminPage from "./pages/UserAdminPage.jsx";
@@ -62,6 +63,7 @@ function AuthenticatedApp() {
   const [notifications, setNotifications] = useState([]);
   const [toasts, setToasts] = useState([]);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sourceMapTarget, setSourceMapTarget] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("nms.sidebarCollapsed") === "true");
   const role = normalizeRole(user?.role);
 
@@ -147,6 +149,11 @@ function AuthenticatedApp() {
     setRoute("dashboard");
   }
 
+  function openSourceMap(target = {}) {
+    if (role !== "ADMIN") return;
+    setSourceMapTarget(target);
+  }
+
   if (!user) {
     return <LoginPage onLogin={setUser} />;
   }
@@ -228,7 +235,13 @@ function AuthenticatedApp() {
           <div className="flex items-center gap-2">
             <div className="hidden text-right text-sm md:block">
               <div className="font-semibold text-ink">{user.display_name || user.username}</div>
-              <div className="text-xs font-semibold text-slate-500">{role} / {user.last_login_ip || "IP -"}</div>
+              <button
+                className="text-right text-xs font-semibold text-slate-500 hover:text-cyan-700"
+                title="Double-click to open Source Map"
+                onDoubleClick={() => openSourceMap({})}
+              >
+                {role} / {user.last_login_ip || "IP -"}
+              </button>
             </div>
             <AlertBell
               count={notifications.length}
@@ -242,7 +255,7 @@ function AuthenticatedApp() {
           </div>
         </header>
         <div className="min-h-0 flex-1 overflow-hidden">
-          <ActivePage role={role} />
+          <ActivePage role={role} onOpenSourceMap={openSourceMap} />
         </div>
       </main>
       <div className="fixed bottom-4 right-4 z-50 w-[min(360px,calc(100vw-32px))] space-y-2">
@@ -260,6 +273,11 @@ function AuthenticatedApp() {
           </div>
         ))}
       </div>
+      <SourceMapModal
+        open={sourceMapTarget !== null}
+        target={sourceMapTarget}
+        onClose={() => setSourceMapTarget(null)}
+      />
     </div>
   );
 }

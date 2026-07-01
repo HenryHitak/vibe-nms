@@ -114,6 +114,13 @@ class DemoAPClientProvider:
         return observations
 
 
+class NoAPClientProvider:
+    name = "not-configured"
+
+    async def get_connected_clients(self, ap: dict[str, Any]) -> list[APClientObservation]:
+        return []
+
+
 class GenericAPIAPClientProvider:
     name = "generic-api"
 
@@ -198,9 +205,11 @@ def provider_for_ap(ap: dict[str, Any], registered_devices: list[dict[str, Any]]
         ap.get("ap_controller_type")
         or ap.get("ap_vendor")
         or settings.ap_client_default_provider
-        or "demo"
+        or "not-configured"
     )
     normalized = str(provider_key).strip().lower().replace("_", "-")
+    if normalized in {"", "none", "off", "disabled", "not-configured", "not-configured-yet"}:
+        return NoAPClientProvider()
     if normalized in {"demo", "local-demo"}:
         return DemoAPClientProvider(registered_devices)
     if normalized in {"meraki", "meraki-api"}:
@@ -215,7 +224,7 @@ def provider_for_ap(ap: dict[str, Any], registered_devices: list[dict[str, Any]]
         return GenericSNMPAPClientProvider()
     if normalized in {"generic", "generic-api"}:
         return GenericAPIAPClientProvider(settings.generic_api_controller_url, settings.generic_api_token)
-    return DemoAPClientProvider(registered_devices)
+    return NoAPClientProvider()
 
 
 def _int_or_none(value: Any) -> int | None:

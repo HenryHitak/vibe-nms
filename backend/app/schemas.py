@@ -110,7 +110,7 @@ class DisplayDashboardRequest(BaseModel):
 class TrafficConfigPayload(BaseModel):
     traffic_collection_enabled: bool = True
     traffic_collection_interval_seconds: int = Field(60, ge=10, le=3600)
-    traffic_default_provider: str = "demo"
+    traffic_default_provider: str = "not-configured"
     traffic_generic_api_url: str | None = None
     traffic_generic_api_token: str | None = None
     cisco_wlc_controller_url: str | None = None

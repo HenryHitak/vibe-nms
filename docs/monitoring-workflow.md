@@ -160,12 +160,12 @@ API --> UI["Traffic Graphs tab"]
 ```text
 NMS_TRAFFIC_COLLECTION_ENABLED=true
 NMS_TRAFFIC_COLLECTION_INTERVAL_SECONDS=60
-NMS_TRAFFIC_DEFAULT_PROVIDER=demo
+NMS_TRAFFIC_DEFAULT_PROVIDER=not-configured
 NMS_TRAFFIC_GENERIC_API_URL=
 NMS_TRAFFIC_GENERIC_API_TOKEN=
 ```
 
-`demo` provider는 UI 확인용입니다. 실제 traffic은 Cisco Controller, SNMP, 또는 사내 collector API에서 백엔드가 가져와야 합니다.
+기본 provider는 `not-configured`라서 demo traffic을 자동 생성하지 않습니다. 실제 traffic은 Cisco Controller, SNMP, 또는 사내 collector API에서 백엔드가 가져오거나 외부 collector가 API로 push해야 합니다.
 
 Traffic Graphs API는 날짜 range와 그래프 단위를 받습니다.
 

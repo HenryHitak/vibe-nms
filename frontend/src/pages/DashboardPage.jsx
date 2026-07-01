@@ -26,7 +26,7 @@ function lossText(value) {
   return value === null || value === undefined || value === "" ? "-" : `${value}%`;
 }
 
-export default function DashboardPage() {
+export default function DashboardPage({ role, onOpenSourceMap }) {
   const [summary, setSummary] = useState(null);
   const [devices, setDevices] = useState([]);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -112,6 +112,11 @@ export default function DashboardPage() {
     setDetailError("");
   }
 
+  function openSourceMapForDevice(device) {
+    if (String(role || "").toUpperCase() !== "ADMIN") return;
+    onOpenSourceMap?.({ device_id: device.id, ip_address: device.ip_address });
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <AlertBanner alerts={summary?.recent_alerts || []} />
@@ -150,6 +155,7 @@ export default function DashboardPage() {
               devices={filteredDevices}
               selectedId={detailOpen ? detailDevice?.id : null}
               onSelect={openDeviceDetail}
+              onIpDoubleClick={String(role || "").toUpperCase() === "ADMIN" ? openSourceMapForDevice : undefined}
               className="h-[calc(100vh-285px)] min-h-[560px]"
             />
           </section>
@@ -175,7 +181,17 @@ export default function DashboardPage() {
                     <div className="mb-2 flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="truncate font-semibold text-ink">{device.device_name}</div>
-                        <div className="truncate text-xs tabular-nums text-slate-500">{device.ip_address}</div>
+                        <div
+                          className="truncate text-xs tabular-nums text-slate-500 hover:text-cyan-700 hover:underline"
+                          title={String(role || "").toUpperCase() === "ADMIN" ? "Double-click to open Source Map" : undefined}
+                          onDoubleClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            openSourceMapForDevice(device);
+                          }}
+                        >
+                          {device.ip_address}
+                        </div>
                       </div>
                       <StatusBadge status={device.status} />
                     </div>

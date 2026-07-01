@@ -56,6 +56,13 @@ class DemoTrafficProvider:
         )
 
 
+class NoTrafficProvider:
+    name = "not-configured"
+
+    async def get_traffic(self, device: dict[str, Any]) -> TrafficObservation | None:
+        return None
+
+
 class GenericAPITrafficProvider:
     name = "generic-api"
 
@@ -110,13 +117,15 @@ class GenericSNMPTrafficProvider:
 
 
 def provider_for_device(device: dict[str, Any]) -> TrafficProvider:
-    default_provider = settings.traffic_default_provider or "demo"
+    default_provider = settings.traffic_default_provider or "not-configured"
     provider_key = default_provider if default_provider != "auto" else (
         device.get("ap_controller_type")
         or device.get("ap_vendor")
-        or "demo"
+        or "not-configured"
     )
     normalized = str(provider_key).strip().lower().replace("_", "-")
+    if normalized in {"", "none", "off", "disabled", "not-configured", "not-configured-yet"}:
+        return NoTrafficProvider()
     if normalized in {"demo", "local-demo"}:
         return DemoTrafficProvider()
     if normalized in {"generic", "generic-api", "traffic-api"}:
@@ -125,7 +134,7 @@ def provider_for_device(device: dict[str, Any]) -> TrafficProvider:
         return CiscoWLCTrafficProvider()
     if normalized in {"snmp", "generic-snmp"}:
         return GenericSNMPTrafficProvider()
-    return DemoTrafficProvider()
+    return NoTrafficProvider()
 
 
 def _float_or_none(value: Any) -> float | None:

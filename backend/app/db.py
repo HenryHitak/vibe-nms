@@ -432,7 +432,7 @@ def init_db() -> None:
                 tx_max_bps REAL,
                 tx_avg_bps REAL,
                 utilization_percent REAL,
-                source TEXT NOT NULL DEFAULT 'demo',
+                source TEXT NOT NULL DEFAULT 'api-ingest',
                 raw_data_json TEXT
             );
 

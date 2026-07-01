@@ -456,9 +456,9 @@ def _traffic_config_from_values(env_values: dict[str, str] | None = None) -> dic
 def _normalized_traffic_payload(payload: TrafficConfigPayload, env_values: dict[str, str] | None = None) -> dict[str, Any]:
     data = payload.model_dump()
     values = env_values or {}
-    provider = str(data.get("traffic_default_provider") or "demo").strip().lower().replace("_", "-")
-    if provider not in {"demo", "generic-api", "cisco-wlc", "generic-snmp", "auto"}:
-        raise HTTPException(status_code=422, detail="Traffic provider must be demo, generic-api, cisco-wlc, generic-snmp, or auto")
+    provider = str(data.get("traffic_default_provider") or "not-configured").strip().lower().replace("_", "-")
+    if provider not in {"not-configured", "demo", "generic-api", "cisco-wlc", "generic-snmp", "auto"}:
+        raise HTTPException(status_code=422, detail="Traffic provider must be not-configured, generic-api, cisco-wlc, generic-snmp, auto, or demo")
     data["traffic_default_provider"] = provider
     data["traffic_collection_interval_seconds"] = min(max(int(data.get("traffic_collection_interval_seconds") or 60), 10), 3600)
     for key in ("traffic_generic_api_url", "traffic_generic_api_token", "cisco_wlc_controller_url", "cisco_wlc_api_token", "generic_snmp_community"):
@@ -544,6 +544,8 @@ def _traffic_bucket(value: Any, bucket: str) -> str:
 
 def _traffic_filter_clauses(filters: dict[str, Any]) -> tuple[list[str], list[Any]]:
     clauses, params = _device_filter_clauses(filters)
+    if str(settings.traffic_default_provider or "").strip().lower().replace("_", "-") not in {"demo", "local-demo"}:
+        clauses.append("LOWER(COALESCE(t.source, '')) NOT IN ('demo', 'local-demo')")
     if filters.get("device_id"):
         clauses.append("d.id = ?")
         params.append(int(filters["device_id"]))
@@ -1304,7 +1306,7 @@ def get_traffic_config(actor: Actor = Depends(get_actor)) -> dict[str, Any]:
         "env_path": str(env_path),
         "runtime": _traffic_config_from_values({}),
         "pending": _traffic_config_from_values(env_values),
-        "providers": ["demo", "generic-api", "cisco-wlc", "generic-snmp", "auto"],
+        "providers": ["not-configured", "generic-api", "cisco-wlc", "generic-snmp", "auto", "demo"],
         "token_fields": {
             "traffic_generic_api_token": "stored in backend env only",
             "cisco_wlc_api_token": "stored in backend env only",
@@ -2612,6 +2614,272 @@ def reference_data() -> dict[str, list[dict[str, Any]]]:
             "access_points": access_points_rows(conn),
             "device_types": [{"value": value} for value in sorted(VALID_DEVICE_TYPES)],
             "criticality": [{"value": value} for value in sorted(VALID_CRITICALITY)],
+        }
+
+
+def _count_table(conn: sqlite3.Connection, table_name: str) -> int:
+    try:
+        return int(conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0])
+    except Exception:
+        return 0
+
+
+def _json_or_none(value: Any) -> Any:
+    if not value:
+        return None
+    try:
+        return json.loads(value)
+    except (TypeError, json.JSONDecodeError):
+        return None
+
+
+def _latest_one(conn: sqlite3.Connection, sql: str, params: tuple[Any, ...] = ()) -> dict[str, Any] | None:
+    return row_to_dict(conn.execute(sql, params).fetchone())
+
+
+def _source_map_sections(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    provider = settings.traffic_default_provider or "not-configured"
+    ap_provider = settings.ap_client_default_provider or "not-configured"
+    return [
+        {
+            "name": "Device Master",
+            "purpose": "Base inventory: device name, IP, MAC, Plant, Line, AP, Switch, location, owner, criticality.",
+            "table": "network_devices",
+            "records": _count_table(conn, "network_devices"),
+            "writes": ["Device Master UI", "Excel Import", "POST /api/devices", "PUT /api/devices/{id}"],
+            "reads": ["Dashboard", "Device Master", "Traffic Graphs", "AP Clients matching", "Display Dashboard API"],
+        },
+        {
+            "name": "Ping Monitoring",
+            "purpose": "ONLINE/WARNING/OFFLINE/CRITICAL status, latency, ICMP loss, TCP fallback result.",
+            "table": "device_metrics",
+            "records": _count_table(conn, "device_metrics"),
+            "worker": "ping monitoring worker",
+            "source": "Backend server inside company network",
+            "settings": {
+                "interval_seconds": settings.collector_interval_seconds,
+                "ping_count": settings.ping_count,
+                "timeout_ms": settings.collector_timeout_ms,
+                "tcp_fallback_ports": settings.tcp_fallback_ports,
+                "corporate_networks": settings.corporate_networks,
+            },
+        },
+        {
+            "name": "AP Client Discovery",
+            "purpose": "Wireless clients currently seen by each AP/controller: IP, MAC, hostname, SSID, VLAN, RSSI, AP association.",
+            "tables": ["ap_client_observations", "ap_connected_clients_current", "ap_client_discovery_runs"],
+            "records": {
+                "observations": _count_table(conn, "ap_client_observations"),
+                "current": _count_table(conn, "ap_connected_clients_current"),
+                "runs": _count_table(conn, "ap_client_discovery_runs"),
+            },
+            "worker": "ap_client_discovery_worker.py",
+            "provider": ap_provider,
+            "tokens_exposed_to_frontend": False,
+        },
+        {
+            "name": "Traffic",
+            "purpose": "RX/TX current, min, avg, max, utilization, interface and source.",
+            "table": "network_traffic_metrics",
+            "records": _count_table(conn, "network_traffic_metrics"),
+            "worker": "traffic monitoring worker or POST /api/traffic/observations",
+            "provider": provider,
+            "real_data_inputs": ["generic-api", "cisco-wlc", "generic-snmp", "POST /api/traffic/observations"],
+            "demo_hidden_when_not_selected": provider not in {"demo", "local-demo"},
+            "tokens_exposed_to_frontend": False,
+        },
+        {
+            "name": "Alerts and Notifications",
+            "purpose": "Network/AP/traffic issues surfaced to Dashboard, notification bell, and Alert Center.",
+            "tables": ["alerts", "notifications"],
+            "records": {
+                "alerts": _count_table(conn, "alerts"),
+                "notifications": _count_table(conn, "notifications"),
+            },
+            "writes": ["Ping worker", "AP client discovery worker", "Alert Center actions", "Alarm Settings"],
+        },
+        {
+            "name": "Audit and Import/Export",
+            "purpose": "Who changed or imported data, source IP, action type, target IP, before/after data.",
+            "tables": ["audit_logs", "import_jobs", "import_job_rows", "export_jobs"],
+            "records": {
+                "audit_logs": _count_table(conn, "audit_logs"),
+                "import_jobs": _count_table(conn, "import_jobs"),
+                "export_jobs": _count_table(conn, "export_jobs"),
+            },
+            "writes": ["Login", "Device CRUD", "User CRUD", "Excel Import", "Exports", "Manual runs", "Settings changes"],
+        },
+        {
+            "name": "Dashboard/API Consumers",
+            "purpose": "Screens and external displays read normalized data through backend APIs.",
+            "endpoints": [
+                "GET /api/dashboard/summary",
+                "GET /api/devices",
+                "GET /api/traffic/summary",
+                "GET /api/dashboard/by-ap",
+                "GET /api/display/dashboard",
+                "GET /api/source-map",
+            ],
+        },
+    ]
+
+
+def _device_source_map(conn: sqlite3.Connection, device_id: int | None, ip_address: str | None) -> dict[str, Any]:
+    device = None
+    if device_id:
+        device = row_to_dict(conn.execute("SELECT * FROM network_devices WHERE id = ?", (device_id,)).fetchone())
+    elif ip_address:
+        device = row_to_dict(conn.execute("SELECT * FROM network_devices WHERE ip_address = ?", (ip_address,)).fetchone())
+    if not device and (device_id or ip_address):
+        raise HTTPException(status_code=404, detail="Source map target not found")
+    if not device:
+        return {
+            "target": None,
+            "latest_monitoring": None,
+            "latest_traffic": None,
+            "ap_current": [],
+            "ap_observations": [],
+            "alerts": [],
+            "audit_logs": [],
+            "import_rows": [],
+        }
+
+    device_ip = device.get("ip_address")
+    device_mac = device.get("mac_address")
+    latest_traffic = _latest_one(
+        conn,
+        """
+        SELECT *
+        FROM network_traffic_metrics
+        WHERE device_id = ?
+        ORDER BY collected_at DESC, id DESC
+        LIMIT 1
+        """,
+        (device["id"],),
+    )
+    if latest_traffic:
+        latest_traffic["raw_data"] = _json_or_none(latest_traffic.pop("raw_data_json", None))
+    latest_monitoring = _latest_one(
+        conn,
+        """
+        SELECT *
+        FROM device_metrics
+        WHERE device_id = ?
+        ORDER BY checked_at DESC, id DESC
+        LIMIT 1
+        """,
+        (device["id"],),
+    )
+    ap_current = rows_to_dicts(
+        conn.execute(
+            """
+            SELECT c.*, ap.device_name AS ap_name, ap.ip_address AS ap_ip_address
+            FROM ap_connected_clients_current c
+            LEFT JOIN network_devices ap ON ap.id = c.ap_id
+            WHERE c.matched_device_id = ?
+               OR (? IS NOT NULL AND c.client_ip_address = ?)
+               OR (? IS NOT NULL AND UPPER(c.client_mac_address) = UPPER(?))
+            ORDER BY c.last_seen DESC, c.id DESC
+            LIMIT 20
+            """,
+            (device["id"], device_ip, device_ip, device_mac, device_mac),
+        ).fetchall()
+    )
+    ap_observations = rows_to_dicts(
+        conn.execute(
+            """
+            SELECT *
+            FROM ap_client_observations
+            WHERE (? IS NOT NULL AND client_ip_address = ?)
+               OR (? IS NOT NULL AND UPPER(client_mac_address) = UPPER(?))
+            ORDER BY last_seen DESC, id DESC
+            LIMIT 20
+            """,
+            (device_ip, device_ip, device_mac, device_mac),
+        ).fetchall()
+    )
+    for row in ap_observations:
+        row["raw_data"] = _json_or_none(row.pop("raw_data_json", None))
+    alerts = rows_to_dicts(
+        conn.execute(
+            """
+            SELECT *
+            FROM alerts
+            WHERE device_id = ?
+            ORDER BY last_detected_at DESC, id DESC
+            LIMIT 20
+            """,
+            (device["id"],),
+        ).fetchall()
+    )
+    audit_logs = rows_to_dicts(
+        conn.execute(
+            """
+            SELECT id, actor_username, actor_role, actor_ip_address, action_type, entity_type,
+                   entity_id, target_ip_address, result, error_message, created_at
+            FROM audit_logs
+            WHERE entity_id = ? OR target_ip_address = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT 20
+            """,
+            (str(device["id"]), device_ip),
+        ).fetchall()
+    )
+    import_rows = rows_to_dicts(
+        conn.execute(
+            """
+            SELECT r.id, r.import_job_id, r.row_number, r.validation_status, r.validation_message,
+                   j.file_name, j.uploaded_by, j.uploaded_from_ip, j.created_at
+            FROM import_job_rows r
+            JOIN import_jobs j ON j.id = r.import_job_id
+            WHERE r.row_data_json LIKE ?
+            ORDER BY j.created_at DESC, r.id DESC
+            LIMIT 20
+            """,
+            (f"%{device_ip}%",),
+        ).fetchall()
+    )
+    return {
+        "target": device,
+        "latest_monitoring": latest_monitoring,
+        "latest_traffic": latest_traffic,
+        "ap_current": ap_current,
+        "ap_observations": ap_observations,
+        "alerts": alerts,
+        "audit_logs": audit_logs,
+        "import_rows": import_rows,
+    }
+
+
+@app.get("/api/source-map")
+def source_map(
+    device_id: int | None = None,
+    ip_address: str | None = None,
+    actor: Actor = Depends(get_actor),
+) -> dict[str, Any]:
+    require_admin(actor)
+    with transaction() as conn:
+        device_map = _device_source_map(conn, device_id, ip_address)
+        return {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "requested_by": {
+                "username": actor.username,
+                "role": actor.role,
+                "ip_address": actor.ip_address,
+            },
+            "database": {
+                "engine": settings.database_engine,
+                "target": settings.mssql_server if settings.database_engine == "mssql" else str(settings.database_path),
+            },
+            "runtime": {
+                "traffic_provider": settings.traffic_default_provider or "not-configured",
+                "ap_client_provider": settings.ap_client_default_provider or "not-configured",
+                "collector_enabled": settings.collector_enabled,
+                "ap_client_discovery_enabled": settings.ap_client_discovery_enabled,
+                "traffic_collection_enabled": settings.traffic_collection_enabled,
+            },
+            "sections": _source_map_sections(conn),
+            "device": device_map,
         }
 
 

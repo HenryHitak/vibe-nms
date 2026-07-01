@@ -132,7 +132,7 @@ function DeviceHoverPreview({ device, position }) {
   );
 }
 
-export default function DeviceTable({ devices = [], selectedId, onSelect, actions, className = "" }) {
+export default function DeviceTable({ devices = [], selectedId, onSelect, onIpDoubleClick, actions, className = "" }) {
   const [preview, setPreview] = useState({ device: null, position: { left: 0, top: 0 } });
 
   function showPreview(device, event) {
@@ -182,7 +182,19 @@ export default function DeviceTable({ devices = [], selectedId, onSelect, action
             >
               <td className="px-3 py-2"><StatusBadge status={device.status} /></td>
               <td className="px-3 py-2 font-semibold text-ink">{device.device_name}</td>
-              <td className="px-3 py-2 tabular-nums">{device.ip_address}</td>
+              <td
+                className={`px-3 py-2 tabular-nums ${onIpDoubleClick ? "cursor-help hover:text-cyan-700 hover:underline" : ""}`}
+                title={onIpDoubleClick ? "Double-click to open Source Map" : undefined}
+                onDoubleClick={(event) => {
+                  if (!onIpDoubleClick) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  hidePreview();
+                  onIpDoubleClick(device);
+                }}
+              >
+                {device.ip_address}
+              </td>
               <td className="px-3 py-2">{device.plant_name || device.plant_code}</td>
               <td className="px-3 py-2">{device.line_name || device.line_code}</td>
               <td className="px-3 py-2">{device.connected_ap_name || "-"}</td>

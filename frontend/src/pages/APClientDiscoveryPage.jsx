@@ -174,7 +174,7 @@ export default function APClientDiscoveryPage({ role }) {
           ) : null}
           {runResult.total_aps > 0 && runResult.total_clients === 0 ? (
             <div className="col-span-full rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              Discovery ran, but no clients were returned. Check AP provider/controller settings or use the demo provider for local testing.
+              Discovery ran, but no clients were returned. Configure each AP with a real controller type such as cisco-wlc, meraki-api, aruba-central-api, unifi-api, generic-snmp, or generic-api.
             </div>
           ) : null}
         </div>

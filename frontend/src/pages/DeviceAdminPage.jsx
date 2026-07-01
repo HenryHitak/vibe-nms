@@ -88,7 +88,7 @@ function normalizedType(value) {
   return String(value || "OTHER").toUpperCase();
 }
 
-export default function DeviceAdminPage() {
+export default function DeviceAdminPage({ onOpenSourceMap }) {
   const [devices, setDevices] = useState([]);
   const [includeDeleted, setIncludeDeleted] = useState(false);
   const [query, setQuery] = useState("");
@@ -343,6 +343,7 @@ export default function DeviceAdminPage() {
         <DeviceTable
           devices={devices}
           onSelect={startEdit}
+          onIpDoubleClick={(device) => onOpenSourceMap?.({ device_id: device.id, ip_address: device.ip_address })}
           selectedId={editing?.id}
           actions={(device) => (
             <div className="inline-flex gap-2">
@@ -417,8 +418,8 @@ export default function DeviceAdminPage() {
                 <label className="block text-sm">
                   <span className="mb-1 block text-slate-600">AP Controller Type</span>
                   <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="ap_controller_type" value={form.ap_controller_type || ""} onChange={updateForm}>
-                    <option value="">Default</option>
-                    {["demo", "meraki-api", "aruba-central-api", "unifi-api", "cisco-wlc", "generic-snmp", "generic-api"].map((value) => (
+                    <option value="">Not configured</option>
+                    {["cisco-wlc", "meraki-api", "aruba-central-api", "unifi-api", "generic-snmp", "generic-api", "demo"].map((value) => (
                       <option key={value} value={value}>{value}</option>
                     ))}
                   </select>

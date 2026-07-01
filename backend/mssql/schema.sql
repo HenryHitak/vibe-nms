@@ -217,7 +217,7 @@ BEGIN
         tx_max_bps FLOAT NULL,
         tx_avg_bps FLOAT NULL,
         utilization_percent FLOAT NULL,
-        source NVARCHAR(80) NOT NULL DEFAULT N'demo',
+        source NVARCHAR(80) NOT NULL DEFAULT N'api-ingest',
         raw_data_json NVARCHAR(MAX) NULL,
         CONSTRAINT fk_network_traffic_metrics_network_devices FOREIGN KEY(device_id) REFERENCES dbo.network_devices(id) ON DELETE CASCADE
     );

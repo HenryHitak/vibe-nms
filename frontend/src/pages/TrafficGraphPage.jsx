@@ -72,7 +72,7 @@ function aggregate(values, key, mode) {
 const EMPTY_CONFIG = {
   traffic_collection_enabled: true,
   traffic_collection_interval_seconds: 60,
-  traffic_default_provider: "demo",
+  traffic_default_provider: "not-configured",
   traffic_generic_api_url: "",
   traffic_generic_api_token: "",
   cisco_wlc_controller_url: "",
@@ -80,7 +80,15 @@ const EMPTY_CONFIG = {
   generic_snmp_community: ""
 };
 
-export default function TrafficGraphPage() {
+function sourceLabel(value) {
+  const source = String(value || "").trim();
+  if (!source) return "-";
+  if (source === "demo") return "Local test data";
+  if (source === "not-configured") return "Not configured";
+  return source;
+}
+
+export default function TrafficGraphPage({ onOpenSourceMap }) {
   const user = getStoredUser();
   const isAdmin = String(user?.role || "").toUpperCase() === "ADMIN";
   const [payload, setPayload] = useState(null);
@@ -255,7 +263,7 @@ export default function TrafficGraphPage() {
     tx: toMbps(row.tx_bps),
     total: toMbps(Number(row.rx_bps || 0) + Number(row.tx_bps || 0))
   }));
-  const sourceText = Object.entries(summary.source_counts || {}).map(([source, count]) => `${source}: ${count}`).join(" / ");
+  const sourceText = Object.entries(summary.source_counts || {}).map(([source, count]) => `${sourceLabel(source)}: ${count}`).join(" / ");
   const rxMin = aggregate(latest, "rx_min_bps", "min");
   const rxMax = aggregate(latest, "rx_max_bps", "max");
   const rxAvg = aggregate(latest, "rx_avg_bps", "avg");
@@ -310,7 +318,7 @@ export default function TrafficGraphPage() {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="font-semibold">Traffic Source</h2>
-                <div className="text-xs text-slate-500">Runtime provider: {configMeta?.runtime?.traffic_default_provider || payload?.settings?.traffic_default_provider || "-"}</div>
+                <div className="text-xs text-slate-500">Runtime provider: {sourceLabel(configMeta?.runtime?.traffic_default_provider || payload?.settings?.traffic_default_provider)}</div>
               </div>
               <button className="h-10 rounded-md bg-ink px-3 text-sm font-semibold text-white disabled:opacity-60" onClick={saveTrafficConfig} disabled={configSaving}>
                 Save Source
@@ -324,12 +332,13 @@ export default function TrafficGraphPage() {
               </label>
               <label className="text-sm">
                 <div className="mb-1 text-xs font-semibold uppercase text-slate-500">Provider</div>
-                <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="traffic_default_provider" value={trafficConfig.traffic_default_provider || "demo"} onChange={changeTrafficConfig}>
-                  <option value="demo">demo</option>
+                <select className="h-10 w-full rounded-md border border-line bg-white px-3" name="traffic_default_provider" value={trafficConfig.traffic_default_provider || "not-configured"} onChange={changeTrafficConfig}>
+                  <option value="not-configured">not configured</option>
                   <option value="generic-api">generic-api</option>
                   <option value="cisco-wlc">cisco-wlc</option>
                   <option value="generic-snmp">generic-snmp</option>
                   <option value="auto">auto</option>
+                  <option value="demo">demo - local test only</option>
                 </select>
               </label>
               <label className="text-sm">
@@ -373,7 +382,7 @@ export default function TrafficGraphPage() {
 
         {!latest.length ? (
           <section className="mb-5 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-            No traffic metrics are available yet. Traffic collection source: {payload?.settings?.traffic_default_provider || "not loaded"}.
+            No real traffic metrics are available yet. Configure `Traffic Source` with generic-api, cisco-wlc, generic-snmp, or push real observations to `POST /api/traffic/observations`.
           </section>
         ) : null}
 
@@ -449,7 +458,17 @@ export default function TrafficGraphPage() {
                 {latest.map((row) => (
                   <tr key={`${row.device_id}-${row.id}`} className="hover:bg-slate-50">
                     <td className="border-b border-line px-3 py-2 font-semibold text-ink">{row.device_name}</td>
-                    <td className="border-b border-line px-3 py-2 tabular-nums">{row.ip_address}</td>
+                    <td
+                      className="border-b border-line px-3 py-2 tabular-nums hover:text-cyan-700 hover:underline"
+                      title="Double-click to open Source Map"
+                      onDoubleClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onOpenSourceMap?.({ device_id: row.device_id, ip_address: row.ip_address });
+                      }}
+                    >
+                      {row.ip_address}
+                    </td>
                     <td className="border-b border-line px-3 py-2">{row.plant_name || "-"} / {row.line_name || "-"}</td>
                     <td className="border-b border-line px-3 py-2">{row.connected_ap_name || row.connected_ap_ip || "-"}</td>
                     <td className="border-b border-line px-3 py-2">{row.switch_name || "-"} {row.switch_port ? `/ ${row.switch_port}` : ""}</td>
@@ -458,7 +477,7 @@ export default function TrafficGraphPage() {
                     <td className="border-b border-line px-3 py-2 tabular-nums">{formatBps(row.rx_min_bps)} / {formatBps(row.rx_avg_bps)} / {formatBps(row.rx_max_bps)}</td>
                     <td className="border-b border-line px-3 py-2 font-semibold tabular-nums text-orange-700">{formatBps(row.tx_bps)}</td>
                     <td className="border-b border-line px-3 py-2 tabular-nums">{formatBps(row.tx_min_bps)} / {formatBps(row.tx_avg_bps)} / {formatBps(row.tx_max_bps)}</td>
-                    <td className="border-b border-line px-3 py-2">{row.source || "-"}</td>
+                    <td className="border-b border-line px-3 py-2">{sourceLabel(row.source)}</td>
                   </tr>
                 ))}
                 {!latest.length ? (
