@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Filter, ServerCrash } from "lucide-react";
+import { AlertTriangle, Filter, Search, ServerCrash } from "lucide-react";
 import { api } from "../api.js";
 import AlertBanner from "../components/AlertBanner.jsx";
 import DeviceDetailModal from "../components/DeviceDetailModal.jsx";
@@ -22,6 +22,10 @@ function isPingOffline(device) {
   return status === "OFFLINE" || status === "CRITICAL" || Number(device.packet_loss_percent || 0) >= 100;
 }
 
+function dashboardStatus(device) {
+  return isPingOffline(device) ? "OFFLINE" : "ONLINE";
+}
+
 function lossText(value) {
   return value === null || value === undefined || value === "" ? "-" : `${value}%`;
 }
@@ -34,6 +38,40 @@ function DeviceTypeBadge({ type }) {
   );
 }
 
+function searchableEntries(device) {
+  const plantName = device.plant_name || device.plant_code;
+  const lineName = device.line_name || device.line_code;
+  const location = [device.building, device.floor, device.area, device.zone, device.detailed_location].filter(Boolean).join(" / ");
+  const switchInfo = [device.switch_name, device.switch_port].filter(Boolean).join(" / ");
+  return [
+    ["Device", device.device_name],
+    ["Type", device.device_type],
+    ["Status", dashboardStatus(device)],
+    ["Raw Status", device.status],
+    ["IP", device.ip_address],
+    ["MAC", device.mac_address],
+    ["Hostname", device.hostname],
+    ["Plant", plantName],
+    ["Line", lineName],
+    ["Location", location],
+    ["AP", device.connected_ap_name],
+    ["AP IP", device.connected_ap_ip],
+    ["Switch", switchInfo],
+    ["VLAN", device.vlan],
+    ["Owner", device.owner_department],
+    ["Criticality", device.criticality],
+    ["Check", device.latest_check_method],
+    ["Reason", device.latest_monitoring_reason],
+    ["Notes", device.notes]
+  ].filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "");
+}
+
+function matchingEntry(device, query) {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return null;
+  return searchableEntries(device).find(([, value]) => String(value).toLowerCase().includes(needle)) || null;
+}
+
 export default function DashboardPage({ role, onOpenSourceMap }) {
   const [summary, setSummary] = useState(null);
   const [devices, setDevices] = useState([]);
@@ -43,6 +81,7 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
   const [detailError, setDetailError] = useState("");
   const [plantFilter, setPlantFilter] = useState("");
   const [lineFilter, setLineFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState("");
 
   async function load() {
@@ -78,7 +117,7 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
     [devices, plantFilter]
   );
 
-  const filteredDevices = useMemo(
+  const plantLineFilteredDevices = useMemo(
     () => devices
       .filter((device) => {
         const plantName = device.plant_name || device.plant_code;
@@ -87,6 +126,32 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
       })
       .sort(compareByLatestUpdate),
     [devices, plantFilter, lineFilter]
+  );
+
+  const filteredDevices = useMemo(
+    () => {
+      const query = searchQuery.trim();
+      if (!query) return plantLineFilteredDevices;
+      return plantLineFilteredDevices.filter((device) => matchingEntry(device, query));
+    },
+    [plantLineFilteredDevices, searchQuery]
+  );
+
+  const dashboardDevices = useMemo(
+    () => filteredDevices.map((device) => ({ ...device, status: dashboardStatus(device) })),
+    [filteredDevices]
+  );
+
+  const searchSuggestions = useMemo(
+    () => {
+      const query = searchQuery.trim();
+      if (!query) return [];
+      return plantLineFilteredDevices
+        .map((device) => ({ device, match: matchingEntry(device, query) }))
+        .filter((item) => item.match)
+        .slice(0, 8);
+    },
+    [plantLineFilteredDevices, searchQuery]
   );
 
   const offlineDevices = useMemo(
@@ -132,7 +197,7 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
         {error ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
 
         <section className="mb-4 rounded-md border border-line bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-start gap-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
               <Filter size={16} className="text-slate-500" /> Filter
             </div>
@@ -144,7 +209,50 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
               <option value="">All Lines</option>
               {lineOptions.map((line) => <option key={line} value={line}>{line}</option>)}
             </select>
-            <button className="h-10 rounded-md border border-line bg-slate-50 px-3 text-sm font-semibold text-slate-700" onClick={() => { setPlantFilter(""); setLineFilter(""); }}>
+            <div className="relative min-w-[260px] flex-1">
+              <div className="flex h-10 items-center gap-2 rounded-md border border-line bg-white px-3">
+                <Search size={16} className="shrink-0 text-slate-500" />
+                <input
+                  className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
+                  placeholder="Search any device information"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                />
+              </div>
+              {searchQuery.trim() ? (
+                <div className="absolute left-0 right-0 top-11 z-20 max-h-80 overflow-auto rounded-md border border-line bg-white shadow-lg">
+                  {searchSuggestions.map(({ device, match }) => {
+                    const plantName = device.plant_name || device.plant_code || "-";
+                    const lineName = device.line_name || device.line_code || "-";
+                    return (
+                      <button
+                        key={device.id}
+                        className="block w-full border-b border-line px-3 py-2 text-left text-sm last:border-b-0 hover:bg-cyan-50"
+                        onClick={() => {
+                          setSearchQuery(String(match?.[1] || device.device_name || ""));
+                          openDeviceDetail(device);
+                        }}
+                      >
+                        <div className="flex min-w-0 items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold text-ink">{device.device_name}</div>
+                            <div className="truncate text-xs text-slate-500">{device.ip_address} / {plantName} / {lineName}</div>
+                          </div>
+                          <StatusBadge status={dashboardStatus(device)} />
+                        </div>
+                        <div className="mt-1 truncate text-xs text-slate-600">
+                          <span className="font-semibold">{match?.[0]}:</span> {String(match?.[1] || "-")}
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {!searchSuggestions.length ? (
+                    <div className="px-3 py-3 text-sm text-slate-500">No matching device information</div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            <button className="h-10 rounded-md border border-line bg-slate-50 px-3 text-sm font-semibold text-slate-700" onClick={() => { setPlantFilter(""); setLineFilter(""); setSearchQuery(""); }}>
               Reset
             </button>
             <div className="ml-auto text-sm text-slate-500">
@@ -160,7 +268,7 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
               <span className="text-sm text-slate-500">Latest update first</span>
             </div>
             <DeviceTable
-              devices={filteredDevices}
+              devices={dashboardDevices}
               selectedId={detailOpen ? detailDevice?.id : null}
               onSelect={openDeviceDetail}
               onIpDoubleClick={String(role || "").toUpperCase() === "ADMIN" ? openSourceMapForDevice : undefined}
@@ -204,7 +312,7 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
                           </span>
                         </div>
                       </div>
-                      <StatusBadge status={device.status} />
+                      <StatusBadge status="OFFLINE" />
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="rounded border border-red-100 bg-red-50 px-2 py-1">
