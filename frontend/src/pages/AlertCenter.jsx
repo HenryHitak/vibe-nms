@@ -97,13 +97,13 @@ export default function AlertCenter({ role = "USER" }) {
   function NotificationList({ adminActions = false, className = "" }) {
     return (
       <aside className={className}>
-        <div className="flex items-center justify-between border-b border-line px-4 py-3">
+        <div className="shrink-0 flex items-center justify-between border-b border-line px-4 py-3">
           <div>
             <h2 className="font-semibold text-ink">Notification List</h2>
             <div className="text-xs text-slate-500">{notifications.filter((item) => !item.read_at).length} unread / {notifications.length} recent</div>
           </div>
         </div>
-        <div className="max-h-[calc(100vh-250px)] overflow-auto">
+        <div className="min-h-0 flex-1 overflow-auto">
           {notifications.map((notification) => {
             const muted = muteMap[notification.alert_type];
             return (
@@ -150,9 +150,11 @@ export default function AlertCenter({ role = "USER" }) {
   }
 
   return (
-    <AdminLayout title="Notification List">
-      {error ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
-      <NotificationList adminActions={isAdmin} className="min-w-0 border border-line bg-white" />
+    <AdminLayout title="Notification List" contentClassName="min-h-0 flex-1 overflow-hidden">
+      <div className="flex h-full min-h-0 flex-col">
+        {error ? <div className="mb-4 shrink-0 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
+        <NotificationList adminActions={isAdmin} className="min-w-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-line bg-white" />
+      </div>
     </AdminLayout>
   );
 }

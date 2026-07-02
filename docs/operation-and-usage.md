@@ -218,7 +218,7 @@ All data tables support horizontal column resizing. Drag the divider on a table 
 
 장치 하나라도 떨어지면 Alert가 생성되고 Dashboard 상단 banner와 notification에 표시됩니다. 상단 Critical/Warning banner는 X 버튼으로 닫을 수 있지만, 실제 Alert가 resolve되는 것은 아닙니다.
 
-`Alert Center`는 Notification List만 보여줍니다. ADMIN은 notification을 read 처리하거나, `Mute`로 해당 Alert type의 새 notification만 막을 수 있습니다. Alert 기록과 상태는 그대로 유지됩니다.
+`Alert Center`는 Notification List만 보여줍니다. 바깥 Alert Center 페이지는 고정되고 Notification List 영역만 스크롤됩니다. ADMIN은 notification을 read 처리하거나, `Mute`로 해당 Alert type의 새 notification만 막을 수 있습니다. Alert 기록과 상태는 그대로 유지됩니다.
 
 `Settings > Alarm Settings`에서 Alert type을 OFF로 바꾸면 즉시 저장되고, 같은 type의 ACTIVE/ACKNOWLEDGED Alert와 unread notification이 바로 정리됩니다. 이 기능은 Alert 자체를 끄는 것이고, `Alert Center`의 `Mute`는 notification만 끄는 기능입니다.
 

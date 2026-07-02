@@ -72,7 +72,7 @@ If a single registered IP drops, the collector creates an ACTIVE warning alert a
 
 ADMIN users can open `Settings > Alarm Settings` to turn alert creation on or off by type. Disabling an alarm type stops new alerts, immediately resolves active alerts for that type, and clears unread notifications tied to that type.
 
-`Alert Center` shows the Notification List. ADMIN users can mute a specific notification type or mark notifications as read. Muting does not delete or resolve alerts; it only stops new dashboard notifications for that alert type until it is unmuted.
+`Alert Center` shows the Notification List. Only the notification list scrolls; the outer Alert Center page stays fixed. ADMIN users can mute a specific notification type or mark notifications as read. Muting does not delete or resolve alerts; it only stops new dashboard notifications for that alert type until it is unmuted.
 
 UI language is controlled from `Settings > Language Settings`. The default language is English, and the available browser UI languages are English, Korean, and Spanish. The selection is saved in the browser.
 

@@ -69,6 +69,8 @@ Device Master > Excel Export
 
 Alarm controls are inside `Settings > Alarm Settings`. Turning an alarm type off stops new alerts for that type and resolves active alerts for that type during the next collector cycle.
 
+`Alert Center` shows only the Notification List. Only the notification list scrolls; the outer Alert Center page stays fixed.
+
 ## Configure
 
 Edit:
