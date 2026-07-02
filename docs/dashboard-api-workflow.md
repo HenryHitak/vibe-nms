@@ -80,6 +80,7 @@ recent_alerts
 recent_metrics
 by_ap
 traffic
+monitoring
 ```
 
 일반적으로 다른 화면은 아래 값만 써도 충분합니다.
@@ -92,6 +93,7 @@ traffic
 | recent_metrics | trend chart |
 | by_ap | AP별 Client summary |
 | traffic | TX/RX current, min, avg, max, trend, top devices |
+| monitoring | ping interval, latest run, next run, and countdown for Dashboard `Ping rerun` |
 
 Traffic API는 별도 endpoint에서 날짜 range와 그래프 bucket을 지정할 수 있습니다.
 

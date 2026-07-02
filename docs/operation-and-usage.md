@@ -186,9 +186,10 @@ Traffic Graphs 화면의 `Traffic Source`에서 provider를 `generic-api`로 바
 2. `Device Master`에서 실제 장치를 등록하거나 Excel로 import합니다.
 3. 모니터링할 장치는 `Monitoring Enabled`를 켭니다.
 4. 장치 ONLINE/WARNING/OFFLINE 상태는 backend ping worker가 계속 갱신합니다.
-5. Dashboard `Devices` table can multi-select devices with checkboxes; click `Selected: count` to open a modal with all selected device information.
-6. Traffic Graphs는 ping 결과가 아니라 `network_traffic_metrics` 데이터입니다. 실제 RX/TX를 보려면 `Traffic Source`를 연결하거나 `/api/traffic/observations`로 실제 observation을 넣어야 합니다.
-7. Production installer는 새 DB에 샘플 장비를 넣지 않도록 `NMS_SEED_SAMPLE_DATA=false`로 설정합니다.
+5. Dashboard filter bar shows `Ping rerun` beside the Line filter so operators can see the next backend ping cycle countdown.
+6. Dashboard `Devices` table can multi-select devices with checkboxes; click `Selected: count` to open a modal with all selected device information.
+7. Traffic Graphs는 ping 결과가 아니라 `network_traffic_metrics` 데이터입니다. 실제 RX/TX를 보려면 `Traffic Source`를 연결하거나 `/api/traffic/observations`로 실제 observation을 넣어야 합니다.
+8. Production installer는 새 DB에 샘플 장비를 넣지 않도록 `NMS_SEED_SAMPLE_DATA=false`로 설정합니다.
 
 ## 8. 로그 확인
 

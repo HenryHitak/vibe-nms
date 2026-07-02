@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckSquare, Filter, PanelRightClose, Search, ServerCrash, X } from "lucide-react";
+import { CheckSquare, Clock3, Filter, PanelRightClose, Search, ServerCrash, X } from "lucide-react";
 import { api } from "../api.js";
 import AlertBanner from "../components/AlertBanner.jsx";
 import DeviceDetailModal from "../components/DeviceDetailModal.jsx";
@@ -9,6 +9,20 @@ import StatusBadge from "../components/StatusBadge.jsx";
 
 const DASHBOARD_REFRESH_MS = 60000;
 const DASHBOARD_COLUMNS = ["status", "device", "type", "ip", "plant", "line"];
+
+function formatCountdown(seconds) {
+  if (seconds === null || seconds === undefined || Number.isNaN(seconds)) return "-";
+  if (seconds <= 0) return "now";
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return minutes ? `${minutes}m ${String(remainingSeconds).padStart(2, "0")}s` : `${remainingSeconds}s`;
+}
+
+function parseUtcDate(value) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 function updateStamp(device) {
   return device.latest_checked_at || device.updated_at || device.created_at || "";
@@ -78,6 +92,7 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
   const [offlinePanelHidden, setOfflinePanelHidden] = useState(() => localStorage.getItem("nms.dashboardOfflinePanelHidden") === "true");
   const [selectedDeviceIds, setSelectedDeviceIds] = useState([]);
   const [selectedDevicesOpen, setSelectedDevicesOpen] = useState(false);
+  const [nowMs, setNowMs] = useState(Date.now());
   const [error, setError] = useState("");
 
   async function load() {
@@ -97,6 +112,11 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
   useEffect(() => {
     load();
     const timer = setInterval(load, DASHBOARD_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -170,6 +190,18 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
       return selectedDeviceIds.map((id) => byId.get(String(id))).filter(Boolean);
     },
     [devices, selectedDeviceIds]
+  );
+
+  const pingRemainingSeconds = useMemo(
+    () => {
+      const nextRunAt = parseUtcDate(summary?.monitoring?.next_run_at);
+      if (nextRunAt) {
+        return Math.max(0, Math.ceil((nextRunAt.getTime() - nowMs) / 1000));
+      }
+      const fallback = Number(summary?.monitoring?.seconds_remaining);
+      return Number.isFinite(fallback) ? Math.max(0, fallback) : null;
+    },
+    [nowMs, summary]
   );
 
   useEffect(() => {
@@ -259,6 +291,14 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
               <option value="">All Lines</option>
               {lineOptions.map((line) => <option key={line} value={line}>{line}</option>)}
             </select>
+            <div
+              className="flex h-10 items-center gap-2 rounded-md border border-line bg-slate-50 px-3 text-sm font-semibold text-slate-700"
+              title={`Monitoring interval: ${summary?.monitoring?.interval_seconds || "-"} seconds`}
+            >
+              <Clock3 size={16} className="text-slate-500" />
+              <span className="text-slate-500">Ping rerun</span>
+              <span className="tabular-nums text-ink">{formatCountdown(pingRemainingSeconds)}</span>
+            </div>
             <div className="relative min-w-[260px] flex-1">
               <div className="flex gap-2">
                 <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-white px-3">

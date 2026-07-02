@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hmac
 import json
 import os
@@ -1217,6 +1217,24 @@ def me(actor: Actor = Depends(get_actor)) -> dict[str, Any]:
         return {"user": _public_user(user)}
 
 
+def _parse_utc_storage_datetime(value: Any) -> datetime | None:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        text = str(value).strip().replace("T", " ")
+        if not text:
+            return None
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 @app.get("/api/dashboard/summary")
 def dashboard_summary() -> dict[str, Any]:
     with transaction() as conn:
@@ -1276,6 +1294,11 @@ def dashboard_summary() -> dict[str, Any]:
                 """
             ).fetchall()
         )
+        latest_run = row_to_dict(conn.execute("SELECT * FROM monitoring_runs ORDER BY started_at DESC, id DESC LIMIT 1").fetchone())
+        interval_seconds = get_monitoring_interval_seconds(conn)
+        latest_run_at = _parse_utc_storage_datetime((latest_run or {}).get("completed_at") or (latest_run or {}).get("started_at"))
+        next_run_at = latest_run_at + timedelta(seconds=interval_seconds) if latest_run_at else None
+        seconds_remaining = max(0, int((next_run_at - datetime.now(timezone.utc)).total_seconds())) if next_run_at else 0
         return {
             "total_devices": total_devices,
             "status_counts": status_counts,
@@ -1285,6 +1308,12 @@ def dashboard_summary() -> dict[str, Any]:
             "status_by_plant": by_plant,
             "recent_alerts": recent_alerts,
             "recent_metrics": recent_metrics,
+            "monitoring": {
+                "interval_seconds": interval_seconds,
+                "latest_run": latest_run,
+                "next_run_at": next_run_at.isoformat().replace("+00:00", "Z") if next_run_at else None,
+                "seconds_remaining": seconds_remaining,
+            },
         }
 
 
