@@ -13,6 +13,14 @@ function formatMs(value) {
   return value == null ? "-" : `${value} ms`;
 }
 
+function DeviceTypeBadge({ type }) {
+  return (
+    <span className="inline-flex max-w-[120px] items-center rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase leading-5 text-slate-700">
+      <span className="truncate">{type || "-"}</span>
+    </span>
+  );
+}
+
 function Stat({ icon: Icon, label, value, tone }) {
   const toneClass = {
     green: "border-green-200 bg-green-50 text-green-800",
@@ -123,6 +131,7 @@ export default function DisplayDashboardPage() {
                 <tr>
                   <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2">Device</th>
+                  <th className="px-3 py-2">Type</th>
                   <th className="px-3 py-2">IP</th>
                   <th className="px-3 py-2">Plant</th>
                   <th className="px-3 py-2">Line</th>
@@ -136,6 +145,7 @@ export default function DisplayDashboardPage() {
                   <tr key={device.id} className="border-t border-line">
                     <td className="px-3 py-2"><StatusBadge status={device.status} /></td>
                     <td className="px-3 py-2 font-semibold">{device.device_name}</td>
+                    <td className="px-3 py-2"><DeviceTypeBadge type={device.device_type} /></td>
                     <td className="px-3 py-2 tabular-nums">{device.ip_address}</td>
                     <td className="px-3 py-2">{device.plant_name || "-"}</td>
                     <td className="px-3 py-2">{device.line_name || "-"}</td>
@@ -146,7 +156,7 @@ export default function DisplayDashboardPage() {
                 ))}
                 {!devices.length ? (
                   <tr>
-                    <td className="px-3 py-8 text-center text-slate-500" colSpan="8">No devices</td>
+                    <td className="px-3 py-8 text-center text-slate-500" colSpan="9">No devices</td>
                   </tr>
                 ) : null}
               </tbody>

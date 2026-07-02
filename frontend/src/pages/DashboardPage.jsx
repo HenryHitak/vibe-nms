@@ -26,6 +26,14 @@ function lossText(value) {
   return value === null || value === undefined || value === "" ? "-" : `${value}%`;
 }
 
+function DeviceTypeBadge({ type }) {
+  return (
+    <span className="inline-flex max-w-[110px] items-center rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase leading-5 text-slate-700">
+      <span className="truncate">{type || "-"}</span>
+    </span>
+  );
+}
+
 export default function DashboardPage({ role, onOpenSourceMap }) {
   const [summary, setSummary] = useState(null);
   const [devices, setDevices] = useState([]);
@@ -181,16 +189,19 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
                     <div className="mb-2 flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="truncate font-semibold text-ink">{device.device_name}</div>
-                        <div
-                          className="truncate text-xs tabular-nums text-slate-500 hover:text-cyan-700 hover:underline"
-                          title={String(role || "").toUpperCase() === "ADMIN" ? "Double-click to open Source Map" : undefined}
-                          onDoubleClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            openSourceMapForDevice(device);
-                          }}
-                        >
-                          {device.ip_address}
+                        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
+                          <DeviceTypeBadge type={device.device_type} />
+                          <span
+                            className="truncate text-xs tabular-nums text-slate-500 hover:text-cyan-700 hover:underline"
+                            title={String(role || "").toUpperCase() === "ADMIN" ? "Double-click to open Source Map" : undefined}
+                            onDoubleClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              openSourceMapForDevice(device);
+                            }}
+                          >
+                            {device.ip_address}
+                          </span>
                         </div>
                       </div>
                       <StatusBadge status={device.status} />

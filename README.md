@@ -51,7 +51,7 @@ Excel device import/export is managed from `Device Master`:
 
 Text values are normalized before save and matching. Leading/trailing spaces are ignored for manual forms, Excel import, filters, external API payloads, backend collector observations, and `.env` config values. Optional fields that contain only spaces are treated as empty. See [Input normalization](docs/input-normalization.md).
 
-Device Master changes the input form by `Device Type`. Enter only confirmed information:
+Device Master starts with `Device Type`. Select the type first, then the form opens only the fields that match that device type. Enter only confirmed information:
 
 - `AP`: AP management IP, AP vendor/controller details, and switch uplink if known. Do not enter a separate connected AP IP for an AP.
 - `PC`, `LAPTOP`, `MOBILE`, `TABLET`, `WORKSTATION`: device IP/MAC/hostname, and expected AP or switch fields only when confirmed.

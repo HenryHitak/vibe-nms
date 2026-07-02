@@ -16,6 +16,14 @@ function boolText(value) {
   return value ? "Enabled" : "Disabled";
 }
 
+function DeviceTypeBadge({ type }) {
+  return (
+    <span className="inline-flex max-w-[120px] items-center rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase leading-5 text-slate-700">
+      <span className="truncate">{valueOrDash(type)}</span>
+    </span>
+  );
+}
+
 function locationText(device) {
   return [device.building, device.floor, device.area, device.zone].filter(Boolean).join(" / ") || "-";
 }
@@ -161,6 +169,7 @@ export default function DeviceTable({ devices = [], selectedId, onSelect, onIpDo
           <tr>
             <th className="px-3 py-2">Status</th>
             <th className="px-3 py-2">Device</th>
+            <th className="px-3 py-2">Type</th>
             <th className="px-3 py-2">IP</th>
             <th className="px-3 py-2">Plant</th>
             <th className="px-3 py-2">Line</th>
@@ -182,6 +191,7 @@ export default function DeviceTable({ devices = [], selectedId, onSelect, onIpDo
             >
               <td className="px-3 py-2"><StatusBadge status={device.status} /></td>
               <td className="px-3 py-2 font-semibold text-ink">{device.device_name}</td>
+              <td className="px-3 py-2"><DeviceTypeBadge type={device.device_type} /></td>
               <td
                 className={`px-3 py-2 tabular-nums ${onIpDoubleClick ? "cursor-help hover:text-cyan-700 hover:underline" : ""}`}
                 title={onIpDoubleClick ? "Double-click to open Source Map" : undefined}
@@ -209,7 +219,7 @@ export default function DeviceTable({ devices = [], selectedId, onSelect, onIpDo
           ))}
           {devices.length === 0 ? (
             <tr>
-              <td className="px-3 py-8 text-center text-slate-500" colSpan={actions ? 9 : 8}>No devices</td>
+              <td className="px-3 py-8 text-center text-slate-500" colSpan={actions ? 10 : 9}>No devices</td>
             </tr>
           ) : null}
         </tbody>
