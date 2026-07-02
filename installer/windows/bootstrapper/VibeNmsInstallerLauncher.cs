@@ -10,7 +10,9 @@ internal static class VibeNmsInstallerLauncher
         string exePath = Process.GetCurrentProcess().MainModule.FileName;
         string exeName = Path.GetFileNameWithoutExtension(exePath);
         bool uninstall = exeName.IndexOf("uninstall", StringComparison.OrdinalIgnoreCase) >= 0;
-        string action = uninstall ? "uninstall" : "install";
+        bool status = exeName.IndexOf("status", StringComparison.OrdinalIgnoreCase) >= 0
+            || exeName.IndexOf("check", StringComparison.OrdinalIgnoreCase) >= 0;
+        string action = status ? "status" : uninstall ? "uninstall" : "install";
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
         string scriptPath = Path.Combine(Path.Combine(baseDir, "installer"), action + ".ps1");
 
@@ -24,7 +26,7 @@ internal static class VibeNmsInstallerLauncher
             return 1;
         }
 
-        if (!IsAdministrator())
+        if (!status && !IsAdministrator())
         {
             return RelaunchAsAdministrator(exePath, args);
         }

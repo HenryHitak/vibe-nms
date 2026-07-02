@@ -16,6 +16,14 @@ If Windows asks for administrator permission, approve it. Do not double-click `.
 
 Do not run `server\vibe-nms-server.exe` directly. That file is the backend runtime used internally by the installed Windows Scheduled Task.
 
+To check whether the server is installed, running, and where it is located, run the root file:
+
+```text
+Check Vibe NMS Status.exe
+```
+
+It shows the install folder, Scheduled Task state, port 8080 listener, health check result, dashboard URL, and start/stop commands.
+
 Open:
 
 ```text

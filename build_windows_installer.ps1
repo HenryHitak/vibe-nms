@@ -66,6 +66,7 @@ Copy-Item -Path (Join-Path $backendDir "dist\vibe-nms-server\*") -Destination (J
 Copy-Item -LiteralPath (Join-Path $frontendDir "dist") -Destination (Join-Path $packageDir "frontend\dist") -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $root "installer\windows\install.ps1") -Destination (Join-Path $packageDir "installer\install.ps1") -Force
 Copy-Item -LiteralPath (Join-Path $root "installer\windows\uninstall.ps1") -Destination (Join-Path $packageDir "installer\uninstall.ps1") -Force
+Copy-Item -LiteralPath (Join-Path $root "installer\windows\status.ps1") -Destination (Join-Path $packageDir "installer\status.ps1") -Force
 Copy-Item -LiteralPath (Join-Path $root "installer\windows\service\run-vibe-nms.ps1") -Destination (Join-Path $packageDir "service\run-vibe-nms.ps1") -Force
 Copy-Item -LiteralPath (Join-Path $root "installer\windows\README-INSTALLER.md") -Destination (Join-Path $packageDir "README-INSTALLER.md") -Force
 
@@ -93,6 +94,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 Copy-Item -LiteralPath $launcherExe -Destination (Join-Path $packageDir "Install Vibe NMS.exe") -Force
 Copy-Item -LiteralPath $launcherExe -Destination (Join-Path $packageDir "Uninstall Vibe NMS.exe") -Force
+Copy-Item -LiteralPath $launcherExe -Destination (Join-Path $packageDir "Check Vibe NMS Status.exe") -Force
 
 Compress-Archive -Path (Join-Path $packageDir "*") -DestinationPath $zipPath -Force
 Write-Host "Created $zipPath"
