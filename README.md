@@ -76,6 +76,8 @@ ADMIN users can also open `Alert Center` and mute a specific alert type. Muting 
 
 UI language is controlled from `Settings > Language Settings`. The default language is English, and the available browser UI languages are English, Korean, and Spanish. The selection is saved in the browser.
 
+Sidebar menu order can be changed by dragging menu items. Main menu items can be reordered inside the main section, and ADMIN items can be reordered inside the ADMIN section. The custom menu order is saved in the browser.
+
 ADMIN users can double-click the top-right `ADMIN / IP` user information to open the Source Map. The Source Map shows where dashboard data comes from: database tables, backend workers, API endpoints, latest ping result, latest traffic source, AP client observations, audit logs, and import history. Device IP cells in Dashboard, Device Master, and Traffic Graphs also open a device-specific Source Map on double-click.
 
 ## Main Dashboard Layout

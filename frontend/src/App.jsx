@@ -46,6 +46,10 @@ const ADMIN_ROUTES = [
   { key: "settings", labelKey: "routes.settings", icon: Settings, page: SystemSettingsPage }
 ];
 
+const PRIMARY_ROUTE_KEYS = ["dashboard", "traffic", "alerts", "ap-clients"];
+const ADMIN_ROUTE_KEYS = ADMIN_ROUTES.map((item) => item.key);
+const MENU_ORDER_STORAGE_KEY = "nms.menuOrder";
+
 function routeFromHash() {
   return window.location.hash.replace(/^#/, "") || "dashboard";
 }
@@ -53,6 +57,27 @@ function routeFromHash() {
 function normalizeRole(value) {
   const role = String(value || "USER").toUpperCase();
   return role === "VIEWER" ? "USER" : role;
+}
+
+function loadMenuOrder() {
+  try {
+    const payload = JSON.parse(localStorage.getItem(MENU_ORDER_STORAGE_KEY) || "{}");
+    return {
+      primary: Array.isArray(payload.primary) ? payload.primary : [],
+      admin: Array.isArray(payload.admin) ? payload.admin : []
+    };
+  } catch {
+    return { primary: [], admin: [] };
+  }
+}
+
+function orderedByPreference(items, preferredKeys) {
+  const byKey = new Map(items.map((item) => [item.key, item]));
+  const ordered = preferredKeys
+    .map((key) => byKey.get(key))
+    .filter(Boolean);
+  const missing = items.filter((item) => !preferredKeys.includes(item.key));
+  return [...ordered, ...missing];
 }
 
 function AuthenticatedApp() {
@@ -65,17 +90,27 @@ function AuthenticatedApp() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sourceMapTarget, setSourceMapTarget] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("nms.sidebarCollapsed") === "true");
+  const [menuOrder, setMenuOrder] = useState(loadMenuOrder);
+  const [draggedMenu, setDraggedMenu] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
   const role = normalizeRole(user?.role);
 
-  const routes = useMemo(() => {
-    const base = [
+  const { primaryRoutes, adminRoutes, routes } = useMemo(() => {
+    const primary = [
       { key: "dashboard", labelKey: "routes.dashboard", icon: Gauge, page: DashboardPage },
       { key: "traffic", labelKey: "routes.traffic", icon: Activity, page: TrafficGraphPage },
       { key: "alerts", labelKey: "routes.alerts", icon: BellRing, page: AlertCenter },
       { key: "ap-clients", labelKey: "routes.apClients", icon: Wifi, page: APClientDiscoveryPage }
-    ];
-    return (role === "ADMIN" ? [...base, ...ADMIN_ROUTES] : base).map((item) => ({ ...item, label: t(item.labelKey) }));
-  }, [role, t]);
+    ].map((item) => ({ ...item, label: t(item.labelKey) }));
+    const admin = ADMIN_ROUTES.map((item) => ({ ...item, label: t(item.labelKey) }));
+    const orderedPrimary = orderedByPreference(primary, menuOrder.primary);
+    const orderedAdmin = role === "ADMIN" ? orderedByPreference(admin, menuOrder.admin) : [];
+    return {
+      primaryRoutes: orderedPrimary,
+      adminRoutes: orderedAdmin,
+      routes: [...orderedPrimary, ...orderedAdmin]
+    };
+  }, [menuOrder, role, t]);
 
   const ActivePage = (routes.find((item) => item.key === route) || routes[0]).page;
 
@@ -143,6 +178,10 @@ function AuthenticatedApp() {
     localStorage.setItem("nms.sidebarCollapsed", String(sidebarCollapsed));
   }, [sidebarCollapsed]);
 
+  useEffect(() => {
+    localStorage.setItem(MENU_ORDER_STORAGE_KEY, JSON.stringify(menuOrder));
+  }, [menuOrder]);
+
   function logout() {
     clearSession();
     setUser(null);
@@ -167,14 +206,62 @@ function AuthenticatedApp() {
     }
   }
 
-  function navButton(item) {
+  function reorderMenuItem(group, draggedKey, targetKey, position) {
+    if (!draggedKey || !targetKey || draggedKey === targetKey) return;
+    const currentRoutes = group === "admin" ? adminRoutes : primaryRoutes;
+    const allowedKeys = group === "admin" ? ADMIN_ROUTE_KEYS : PRIMARY_ROUTE_KEYS;
+    const currentKeys = currentRoutes.map((item) => item.key);
+    if (!currentKeys.includes(draggedKey) || !currentKeys.includes(targetKey)) return;
+
+    const nextKeys = currentKeys.filter((key) => key !== draggedKey);
+    const targetIndex = nextKeys.indexOf(targetKey);
+    const insertIndex = position === "after" ? targetIndex + 1 : targetIndex;
+    nextKeys.splice(insertIndex, 0, draggedKey);
+
+    setMenuOrder((current) => ({
+      ...current,
+      [group]: nextKeys.filter((key) => allowedKeys.includes(key))
+    }));
+  }
+
+  function navButton(item, group) {
     const Icon = item.icon;
     const active = route === item.key;
+    const isDragging = draggedMenu?.group === group && draggedMenu?.key === item.key;
+    const isDropTarget = dropTarget?.group === group && dropTarget?.key === item.key;
     return (
       <button
         key={item.key}
-        className={`flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-medium transition-colors ${sidebarCollapsed ? "justify-center px-0" : ""} ${active ? "bg-ink text-white" : "text-slate-700 hover:bg-slate-100"}`}
+        draggable
+        className={`flex h-10 w-full cursor-grab items-center gap-3 rounded-md px-3 text-left text-sm font-medium transition-colors active:cursor-grabbing ${sidebarCollapsed ? "justify-center px-0" : ""} ${active ? "bg-ink text-white" : "text-slate-700 hover:bg-slate-100"} ${isDragging ? "opacity-50" : ""} ${isDropTarget ? "ring-2 ring-cyan-500 ring-offset-1" : ""}`}
         title={item.label}
+        onDragStart={(event) => {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", item.key);
+          setDraggedMenu({ group, key: item.key });
+        }}
+        onDragOver={(event) => {
+          if (draggedMenu?.group !== group || draggedMenu?.key === item.key) return;
+          event.preventDefault();
+          const rect = event.currentTarget.getBoundingClientRect();
+          const position = event.clientY > rect.top + rect.height / 2 ? "after" : "before";
+          event.dataTransfer.dropEffect = "move";
+          setDropTarget({ group, key: item.key, position });
+        }}
+        onDragLeave={() => {
+          setDropTarget((current) => (current?.key === item.key && current?.group === group ? null : current));
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          const draggedKey = draggedMenu?.key || event.dataTransfer.getData("text/plain");
+          reorderMenuItem(group, draggedKey, item.key, dropTarget?.position || "before");
+          setDraggedMenu(null);
+          setDropTarget(null);
+        }}
+        onDragEnd={() => {
+          setDraggedMenu(null);
+          setDropTarget(null);
+        }}
         onClick={() => {
           setRoute(item.key);
           setMobileOpen(false);
@@ -207,7 +294,7 @@ function AuthenticatedApp() {
           {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
         </button>
         <nav className="space-y-1">
-          {routes.slice(0, 4).map(navButton)}
+          {primaryRoutes.map((item) => navButton(item, "primary"))}
         </nav>
         {role === "ADMIN" ? (
           <>
@@ -215,7 +302,7 @@ function AuthenticatedApp() {
               <Shield size={14} /> {!sidebarCollapsed ? t("app.admin") : null}
             </div>
             <nav className="space-y-1">
-              {routes.slice(4).map(navButton)}
+              {adminRoutes.map((item) => navButton(item, "admin"))}
             </nav>
           </>
         ) : null}
