@@ -54,9 +54,8 @@ Text values are normalized before save and matching. Leading/trailing spaces are
 Device Master starts with `Device Type`. Select the type first, then the form opens only the fields that match that device type. Enter only confirmed information:
 
 - `AP`: AP management IP, AP vendor/controller details, and switch uplink if known. Do not enter a separate connected AP IP for an AP.
-- `PC`, `LAPTOP`, `MOBILE`, `TABLET`, `WORKSTATION`: device IP/MAC/hostname, and expected AP or switch fields only when confirmed.
-- `PLC`, `HMI`, `ROBOT`, `SCANNER`, `CAMERA`, `PRINTER`, `SENSOR`, `IOT`: production device identity plus expected AP or switch fields only when confirmed.
-- `SWITCH`, `ROUTER`, `FIREWALL`, `CONTROLLER`, `SERVER`, `NAS`, `UPS`: infrastructure identity fields; unrelated wireless AP fields are hidden or cleared.
+- Non-AP devices: device IP/MAC/hostname plus `Expected AP Name/IP` when known, so AP Clients can group and verify them under the correct AP.
+- Switch fields are shown only for device types where a switch/port relationship is normally useful.
 
 ## Monitoring Behavior
 

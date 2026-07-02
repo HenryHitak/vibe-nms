@@ -81,7 +81,6 @@ const DEVICE_TYPE_HELP = {
   OTHER: "Other device"
 };
 
-const WIRELESS_CLIENT_TYPES = new Set(["WORKSTATION", "PC", "LAPTOP", "MOBILE", "TABLET", "IOT", "HMI", "PLC", "ROBOT", "SCANNER", "CAMERA", "PRINTER", "SENSOR"]);
 const SWITCH_PORT_TYPES = new Set(["AP", "WORKSTATION", "PC", "LAPTOP", "PLC", "HMI", "ROBOT", "SCANNER", "CAMERA", "PRINTER", "SENSOR", "IOT", "SERVER", "NAS", "UPS"]);
 const NETWORK_IDENTITY_TYPES = new Set(["AP", "SWITCH", "ROUTER", "FIREWALL", "CONTROLLER", "SERVER", "NAS", "UPS", "WORKSTATION", "PC", "LAPTOP", "MOBILE", "TABLET", "PLC", "HMI", "ROBOT", "SCANNER", "CAMERA", "PRINTER", "SENSOR", "IOT", "OTHER"]);
 
@@ -172,7 +171,7 @@ export default function DeviceAdminPage({ onOpenSourceMap }) {
         device_type: deviceType,
         monitoring_enabled: Boolean(form.monitoring_enabled)
       };
-      const supportsWireless = deviceType !== "AP" && WIRELESS_CLIENT_TYPES.has(deviceType);
+      const supportsExpectedAp = deviceType !== "AP";
       const supportsSwitch = SWITCH_PORT_TYPES.has(deviceType);
       if (deviceType === "AP") {
         payload.connected_ap_name = null;
@@ -182,7 +181,7 @@ export default function DeviceAdminPage({ onOpenSourceMap }) {
         payload.ap_controller_type = null;
         payload.ap_controller_id = null;
       }
-      if (!supportsWireless) {
+      if (!supportsExpectedAp) {
         payload.connected_ap_name = null;
         payload.connected_ap_ip = null;
       }
@@ -273,7 +272,7 @@ export default function DeviceAdminPage({ onOpenSourceMap }) {
   const deviceType = normalizedType(form.device_type);
   const hasDeviceType = Boolean(deviceType);
   const isAp = deviceType === "AP";
-  const showWirelessFields = !isAp && WIRELESS_CLIENT_TYPES.has(deviceType);
+  const showExpectedApFields = hasDeviceType && !isAp;
   const showSwitchFields = SWITCH_PORT_TYPES.has(deviceType);
   const showNetworkIdentity = NETWORK_IDENTITY_TYPES.has(deviceType);
 
@@ -474,10 +473,10 @@ export default function DeviceAdminPage({ onOpenSourceMap }) {
               </FormSection>
             ) : null}
 
-            {hasDeviceType && showWirelessFields ? (
-              <FormSection title="Expected wireless AP">
-                <Field label="Expected AP Name" name="connected_ap_name" value={form.connected_ap_name} onChange={updateForm} />
-                <Field label="Expected AP IP" name="connected_ap_ip" value={form.connected_ap_ip} onChange={updateForm} />
+            {showExpectedApFields ? (
+              <FormSection title="Expected AP registration">
+                <Field label="Expected AP Name" name="connected_ap_name" value={form.connected_ap_name} onChange={updateForm} hint="Optional, but recommended for AP Client matching." />
+                <Field label="Expected AP IP" name="connected_ap_ip" value={form.connected_ap_ip} onChange={updateForm} hint="Used by AP Clients to group and verify the device under an AP." />
               </FormSection>
             ) : null}
 
