@@ -95,6 +95,7 @@ The main dashboard is focused on live device operations:
 - Dashboard device status is displayed as `ONLINE` or `OFFLINE` only.
 - Offline ping list includes devices whose raw monitoring status is OFFLINE/CRITICAL or whose packet loss is 100%.
 - Dashboard and Offline Ping tables show only Status, Device, Type, IP, Plant, and Line. AP, Switch, and ICMP Loss stay available in hover preview and detail views.
+- Devices can be multi-selected with checkboxes. Click `Selected: count` to open a modal that lists all selected device information.
 - Dashboard search checks device name, type, status, IP, MAC, hostname, Plant, Line, location, AP, Switch, VLAN, owner, criticality, latest check, reason, and notes. Matching devices appear under the search box while typing.
 - Press `Enter` or click `Confirm` in the dashboard search box to apply the search to the device list. It does not open device detail.
 - The dashboard refreshes from backend monitoring data every 60 seconds. The browser does not ping devices directly.

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Filter, PanelRightClose, Search, ServerCrash } from "lucide-react";
+import { CheckSquare, Filter, PanelRightClose, Search, ServerCrash, X } from "lucide-react";
 import { api } from "../api.js";
 import AlertBanner from "../components/AlertBanner.jsx";
 import DeviceDetailModal from "../components/DeviceDetailModal.jsx";
 import DeviceTable from "../components/DeviceTable.jsx";
+import SelectedDevicesModal from "../components/SelectedDevicesModal.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 
 const DASHBOARD_REFRESH_MS = 60000;
@@ -75,6 +76,8 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false);
   const [offlinePanelHidden, setOfflinePanelHidden] = useState(() => localStorage.getItem("nms.dashboardOfflinePanelHidden") === "true");
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState([]);
+  const [selectedDevicesOpen, setSelectedDevicesOpen] = useState(false);
   const [error, setError] = useState("");
 
   async function load() {
@@ -100,6 +103,11 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
   useEffect(() => {
     localStorage.setItem("nms.dashboardOfflinePanelHidden", String(offlinePanelHidden));
   }, [offlinePanelHidden]);
+
+  useEffect(() => {
+    const validIds = new Set(devices.map((device) => String(device.id)));
+    setSelectedDeviceIds((current) => current.filter((id) => validIds.has(String(id))));
+  }, [devices]);
 
   const plantOptions = useMemo(
     () => [...new Set(devices.map((device) => device.plant_name || device.plant_code).filter(Boolean))].sort(),
@@ -156,6 +164,14 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
     [filteredDevices]
   );
 
+  const selectedDevices = useMemo(
+    () => {
+      const byId = new Map(devices.map((device) => [String(device.id), device]));
+      return selectedDeviceIds.map((id) => byId.get(String(id))).filter(Boolean);
+    },
+    [devices, selectedDeviceIds]
+  );
+
   useEffect(() => {
     if (lineFilter && !lineOptions.includes(lineFilter)) {
       setLineFilter("");
@@ -196,6 +212,32 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
     if (event.isComposing || event.key !== "Enter") return;
     event.preventDefault();
     applySearch();
+  }
+
+  function toggleDeviceSelection(device, checked) {
+    const id = String(device.id);
+    setSelectedDeviceIds((current) => {
+      const next = new Set(current.map(String));
+      if (checked) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return Array.from(next);
+    });
+  }
+
+  function toggleVisibleDeviceSelection(ids, checked) {
+    const visibleIds = new Set(ids.map(String));
+    setSelectedDeviceIds((current) => {
+      const next = new Set(current.map(String));
+      if (checked) {
+        visibleIds.forEach((id) => next.add(id));
+      } else {
+        visibleIds.forEach((id) => next.delete(id));
+      }
+      return Array.from(next);
+    });
   }
 
   return (
@@ -288,6 +330,22 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="flex min-w-0 flex-wrap items-center gap-3">
                 <h2 className="font-semibold">Devices</h2>
+                {selectedDevices.length ? (
+                  <>
+                    <button
+                      className="inline-flex h-7 items-center gap-1 rounded-md border border-cyan-200 bg-cyan-50 px-2 text-xs font-semibold text-cyan-900 hover:bg-cyan-100"
+                      onClick={() => setSelectedDevicesOpen(true)}
+                    >
+                      <CheckSquare size={14} /> Selected: <span className="tabular-nums">{selectedDevices.length}</span>
+                    </button>
+                    <button
+                      className="inline-flex h-7 items-center gap-1 rounded-md border border-line bg-white px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                      onClick={() => setSelectedDeviceIds([])}
+                    >
+                      <X size={13} /> Clear
+                    </button>
+                  </>
+                ) : null}
                 {offlinePanelHidden ? (
                   <button
                     className="inline-flex h-7 items-center rounded-md border border-red-200 bg-red-50 px-2 text-xs font-semibold text-red-800 hover:bg-red-100"
@@ -306,6 +364,10 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
               onSelect={openDeviceDetail}
               onIpDoubleClick={String(role || "").toUpperCase() === "ADMIN" ? openSourceMapForDevice : undefined}
               columns={DASHBOARD_COLUMNS}
+              selectable
+              selectedIds={selectedDeviceIds}
+              onToggleSelect={toggleDeviceSelection}
+              onToggleSelectAll={toggleVisibleDeviceSelection}
               className="h-[calc(100vh-285px)] min-h-[560px]"
             />
           </section>
@@ -346,6 +408,11 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
         loading={detailLoading}
         error={detailError}
         onClose={closeDeviceDetail}
+      />
+      <SelectedDevicesModal
+        open={selectedDevicesOpen}
+        devices={selectedDevices}
+        onClose={() => setSelectedDevicesOpen(false)}
       />
     </div>
   );

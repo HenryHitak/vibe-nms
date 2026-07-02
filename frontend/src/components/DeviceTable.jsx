@@ -142,11 +142,27 @@ function DeviceHoverPreview({ device, position }) {
 
 const DEFAULT_COLUMNS = ["status", "device", "type", "ip", "plant", "line", "ap", "switch", "loss"];
 
-export default function DeviceTable({ devices = [], selectedId, onSelect, onIpDoubleClick, actions, className = "", columns = DEFAULT_COLUMNS }) {
+export default function DeviceTable({
+  devices = [],
+  selectedId,
+  onSelect,
+  onIpDoubleClick,
+  actions,
+  className = "",
+  columns = DEFAULT_COLUMNS,
+  selectable = false,
+  selectedIds = [],
+  onToggleSelect,
+  onToggleSelectAll
+}) {
   const [preview, setPreview] = useState({ device: null, position: { left: 0, top: 0 } });
   const visibleColumns = columns.filter((column) => DEFAULT_COLUMNS.includes(column));
   const hasColumn = (column) => visibleColumns.includes(column);
-  const totalColumns = visibleColumns.length + (actions ? 1 : 0);
+  const selectedIdSet = new Set(selectedIds.map((id) => String(id)));
+  const selectableDeviceIds = devices.map((device) => device.id).filter((id) => id !== null && id !== undefined);
+  const allVisibleSelected = selectableDeviceIds.length > 0 && selectableDeviceIds.every((id) => selectedIdSet.has(String(id)));
+  const someVisibleSelected = selectableDeviceIds.some((id) => selectedIdSet.has(String(id)));
+  const totalColumns = visibleColumns.length + (actions ? 1 : 0) + (selectable ? 1 : 0);
 
   function showPreview(device, event) {
     setPreview({ device, position: previewPosition(event) });
@@ -172,6 +188,20 @@ export default function DeviceTable({ devices = [], selectedId, onSelect, onIpDo
       <table className="min-w-full border-collapse text-left text-sm">
         <thead className="sticky top-0 bg-slate-100 text-xs uppercase text-slate-600">
           <tr>
+            {selectable ? (
+              <th className="w-12 px-3 py-2">
+                <input
+                  aria-label="Select all visible devices"
+                  className="h-4 w-4 rounded border-line"
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  ref={(input) => {
+                    if (input) input.indeterminate = !allVisibleSelected && someVisibleSelected;
+                  }}
+                  onChange={(event) => onToggleSelectAll?.(selectableDeviceIds, event.target.checked)}
+                />
+              </th>
+            ) : null}
             {hasColumn("status") ? <th className="px-3 py-2">Status</th> : null}
             {hasColumn("device") ? <th className="px-3 py-2">Device</th> : null}
             {hasColumn("type") ? <th className="px-3 py-2">Type</th> : null}
@@ -194,6 +224,17 @@ export default function DeviceTable({ devices = [], selectedId, onSelect, onIpDo
               onMouseMove={movePreview}
               onMouseLeave={hidePreview}
             >
+              {selectable ? (
+                <td className="px-3 py-2" onClick={(event) => event.stopPropagation()}>
+                  <input
+                    aria-label={`Select ${device.device_name || "device"}`}
+                    className="h-4 w-4 rounded border-line"
+                    type="checkbox"
+                    checked={selectedIdSet.has(String(device.id))}
+                    onChange={(event) => onToggleSelect?.(device, event.target.checked)}
+                  />
+                </td>
+              ) : null}
               {hasColumn("status") ? <td className="px-3 py-2"><StatusBadge status={device.status} /></td> : null}
               {hasColumn("device") ? <td className="px-3 py-2 font-semibold text-ink">{device.device_name}</td> : null}
               {hasColumn("type") ? <td className="px-3 py-2"><DeviceTypeBadge type={device.device_type} /></td> : null}
