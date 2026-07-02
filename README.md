@@ -78,6 +78,8 @@ UI language is controlled from `Settings > Language Settings`. The default langu
 
 Sidebar menu order can be changed by dragging menu items. Main menu items can be reordered inside the main section, and ADMIN items can be reordered inside the ADMIN section. The custom menu order is saved in the browser.
 
+The main menu shows `Dashboard` and `Alert Center`. `Traffic Graphs`, `AP Clients`, user management, Device Master, logs, DB Config, Backend Info, and Settings are under the `ADMIN` section and require an ADMIN account.
+
 ADMIN users can double-click the top-right `ADMIN / IP` user information to open the Source Map. The Source Map shows where dashboard data comes from: database tables, backend workers, API endpoints, latest ping result, latest traffic source, AP client observations, audit logs, and import history. Device IP cells in Dashboard, Device Master, and Traffic Graphs also open a device-specific Source Map on double-click.
 
 ## Main Dashboard Layout
@@ -92,7 +94,7 @@ The main dashboard is focused on live device operations:
 - Offline ping list includes devices whose raw monitoring status is OFFLINE/CRITICAL or whose packet loss is 100%.
 - Dashboard and Offline Ping tables show only Status, Device, Type, IP, Plant, and Line. AP, Switch, and ICMP Loss stay available in hover preview and detail views.
 - Dashboard search checks device name, type, status, IP, MAC, hostname, Plant, Line, location, AP, Switch, VLAN, owner, criticality, latest check, reason, and notes. Matching devices appear under the search box while typing.
-- Press `Enter` in the dashboard search box to open the first matching device.
+- Press `Enter` or click `Confirm` in the dashboard search box to apply the search to the device list. It does not open device detail.
 - The dashboard refreshes from backend monitoring data every 60 seconds. The browser does not ping devices directly.
 
 ## AP Client Discovery

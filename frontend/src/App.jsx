@@ -37,6 +37,8 @@ import UserAdminPage from "./pages/UserAdminPage.jsx";
 import { useI18n } from "./i18n.jsx";
 
 const ADMIN_ROUTES = [
+  { key: "traffic", labelKey: "routes.traffic", icon: Activity, page: TrafficGraphPage },
+  { key: "ap-clients", labelKey: "routes.apClients", icon: Wifi, page: APClientDiscoveryPage },
   { key: "users", labelKey: "routes.users", icon: UserRound, page: UserAdminPage },
   { key: "devices", labelKey: "routes.devices", icon: Server, page: DeviceAdminPage },
   { key: "audit", labelKey: "routes.audit", icon: History, page: AuditLogPage },
@@ -46,7 +48,7 @@ const ADMIN_ROUTES = [
   { key: "settings", labelKey: "routes.settings", icon: Settings, page: SystemSettingsPage }
 ];
 
-const PRIMARY_ROUTE_KEYS = ["dashboard", "traffic", "alerts", "ap-clients"];
+const PRIMARY_ROUTE_KEYS = ["dashboard", "alerts"];
 const USER_ROUTE_KEYS = ["dashboard", "alerts"];
 const ADMIN_ROUTE_KEYS = ADMIN_ROUTES.map((item) => item.key);
 const MENU_ORDER_STORAGE_KEY = "nms.menuOrder";
@@ -99,9 +101,7 @@ function AuthenticatedApp() {
   const { primaryRoutes, adminRoutes, routes } = useMemo(() => {
     const allPrimary = [
       { key: "dashboard", labelKey: "routes.dashboard", icon: Gauge, page: DashboardPage },
-      { key: "traffic", labelKey: "routes.traffic", icon: Activity, page: TrafficGraphPage },
-      { key: "alerts", labelKey: "routes.alerts", icon: BellRing, page: AlertCenter },
-      { key: "ap-clients", labelKey: "routes.apClients", icon: Wifi, page: APClientDiscoveryPage }
+      { key: "alerts", labelKey: "routes.alerts", icon: BellRing, page: AlertCenter }
     ].map((item) => ({ ...item, label: t(item.labelKey) }));
     const allowedPrimaryKeys = role === "ADMIN" ? PRIMARY_ROUTE_KEYS : USER_ROUTE_KEYS;
     const primary = allPrimary.filter((item) => allowedPrimaryKeys.includes(item.key));

@@ -142,7 +142,7 @@ Main dashboard layout:
 - Device list order: latest monitoring check or manual update first.
 - Offline ping list includes red OFFLINE/CRITICAL devices and devices with 100% packet loss.
 - Dashboard and Offline Ping tables show Status, Device, Type, IP, Plant, and Line only.
-- Dashboard search opens the first matching device when Enter is pressed.
+- Dashboard search applies the typed value to the device list when Enter is pressed or Confirm is clicked. It does not open device detail.
 - Backend ping monitoring runs every 60 seconds by default:
 
 ```text
@@ -187,7 +187,7 @@ Start-ScheduledTask -TaskName VibeNMS
 
 AP controller API tokens also go in `.env`; they are only read by the backend process and are not exposed to the browser.
 
-`AP Clients` includes CRUD for registered wireless clients. Admins can add an observed unknown client as a known device, edit it, or delete the registration from that AP.
+`AP Clients` is a monitoring-only screen. To register or edit a known wireless device, use `Device Master` and enter the expected AP information there.
 
 External display dashboard:
 

@@ -71,7 +71,9 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
   const [detailError, setDetailError] = useState("");
   const [plantFilter, setPlantFilter] = useState("");
   const [lineFilter, setLineFilter] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false);
   const [offlinePanelHidden, setOfflinePanelHidden] = useState(() => localStorage.getItem("nms.dashboardOfflinePanelHidden") === "true");
   const [error, setError] = useState("");
 
@@ -139,14 +141,14 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
 
   const searchSuggestions = useMemo(
     () => {
-      const query = searchQuery.trim();
+      const query = searchInput.trim();
       if (!query) return [];
       return plantLineFilteredDevices
         .map((device) => ({ device, match: matchingEntry(device, query) }))
         .filter((item) => item.match)
         .slice(0, 8);
     },
-    [plantLineFilteredDevices, searchQuery]
+    [plantLineFilteredDevices, searchInput]
   );
 
   const offlineDevices = useMemo(
@@ -185,14 +187,15 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
     onOpenSourceMap?.({ device_id: device.id, ip_address: device.ip_address });
   }
 
+  function applySearch(value = searchInput) {
+    setSearchQuery(value.trim());
+    setSearchSuggestionsOpen(false);
+  }
+
   function handleSearchKeyDown(event) {
     if (event.isComposing || event.key !== "Enter") return;
     event.preventDefault();
-    if (!searchQuery.trim()) return;
-    const firstMatch = searchSuggestions[0]?.device || filteredDevices[0];
-    if (firstMatch) {
-      openDeviceDetail(firstMatch);
-    }
+    applySearch();
   }
 
   return (
@@ -215,17 +218,29 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
               {lineOptions.map((line) => <option key={line} value={line}>{line}</option>)}
             </select>
             <div className="relative min-w-[260px] flex-1">
-              <div className="flex h-10 items-center gap-2 rounded-md border border-line bg-white px-3">
-                <Search size={16} className="shrink-0 text-slate-500" />
-                <input
-                  className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
-                  placeholder="Search any device information"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onKeyDown={handleSearchKeyDown}
-                />
+              <div className="flex gap-2">
+                <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-white px-3">
+                  <Search size={16} className="shrink-0 text-slate-500" />
+                  <input
+                    className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
+                    placeholder="Search any device information"
+                    value={searchInput}
+                    onChange={(event) => {
+                      setSearchInput(event.target.value);
+                      setSearchSuggestionsOpen(true);
+                    }}
+                    onFocus={() => setSearchSuggestionsOpen(Boolean(searchInput.trim()))}
+                    onKeyDown={handleSearchKeyDown}
+                  />
+                </div>
+                <button
+                  className="h-10 rounded-md border border-line bg-ink px-3 text-sm font-semibold text-white hover:bg-slate-800"
+                  onClick={() => applySearch()}
+                >
+                  Confirm
+                </button>
               </div>
-              {searchQuery.trim() ? (
+              {searchInput.trim() && searchSuggestionsOpen ? (
                 <div className="absolute left-0 right-0 top-11 z-20 max-h-80 overflow-auto rounded-md border border-line bg-white shadow-lg">
                   {searchSuggestions.map(({ device, match }) => {
                     const plantName = device.plant_name || device.plant_code || "-";
@@ -235,8 +250,9 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
                         key={device.id}
                         className="block w-full border-b border-line px-3 py-2 text-left text-sm last:border-b-0 hover:bg-cyan-50"
                         onClick={() => {
-                          setSearchQuery(String(match?.[1] || device.device_name || ""));
-                          openDeviceDetail(device);
+                          const nextQuery = String(match?.[1] || device.device_name || "");
+                          setSearchInput(nextQuery);
+                          applySearch(nextQuery);
                         }}
                       >
                         <div className="flex min-w-0 items-center justify-between gap-3">
@@ -258,7 +274,7 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
                 </div>
               ) : null}
             </div>
-            <button className="h-10 rounded-md border border-line bg-slate-50 px-3 text-sm font-semibold text-slate-700" onClick={() => { setPlantFilter(""); setLineFilter(""); setSearchQuery(""); }}>
+            <button className="h-10 rounded-md border border-line bg-slate-50 px-3 text-sm font-semibold text-slate-700" onClick={() => { setPlantFilter(""); setLineFilter(""); setSearchInput(""); setSearchQuery(""); setSearchSuggestionsOpen(false); }}>
               Reset
             </button>
             <div className="ml-auto text-sm text-slate-500">
