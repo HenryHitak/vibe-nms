@@ -72,7 +72,7 @@ If a single registered IP drops, the collector creates an ACTIVE warning alert a
 
 ADMIN users can open `Settings > Alarm Settings` to turn alert creation on or off by type. Disabling an alarm type stops new alerts, immediately resolves active alerts for that type, and clears unread notifications tied to that type.
 
-ADMIN users can also open `Alert Center` and mute a specific alert type. Muting does not delete or resolve alerts; it only stops new dashboard notifications for that alert type until it is unmuted.
+`Alert Center` shows the Notification List. ADMIN users can mute a specific notification type or mark notifications as read. Muting does not delete or resolve alerts; it only stops new dashboard notifications for that alert type until it is unmuted.
 
 UI language is controlled from `Settings > Language Settings`. The default language is English, and the available browser UI languages are English, Korean, and Spanish. The selection is saved in the browser.
 
@@ -304,7 +304,7 @@ This package contains:
 - Device CRUD with soft delete and restore
 - CRUD audit logs with username, role, source IP, user agent, before/after data, request id, and result
 - Excel template, import preview, import commit, Excel export, full backup zip, migration JSON
-- Alert Center with acknowledge, resolve, notification history, and per-alert-type mute/unmute
+- Alert Center notification history with ADMIN mark-read and per-alert-type mute/unmute
 - Login with ADMIN / USER roles
 - Admin user account creation, disable, and password reset
 - React dashboard/admin UI with green, orange, red, and gray device states
