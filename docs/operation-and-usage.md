@@ -75,6 +75,8 @@ Stop-ScheduledTask -TaskName VibeNMS
 Start-ScheduledTask -TaskName VibeNMS
 ```
 
+ADMIN users can change `Backend Info > Background Workers > Ping Interval` to 30, 40, 50, 60, 70, 80, or 90 seconds. The value is stored in `system_settings.monitoring_interval_seconds` and applies on the next worker loop.
+
 현재 백엔드와 DB 상태는 `Backend Info` 화면에서 확인합니다.
 
 관리 화면은 공통 레이아웃에서 페이지 내부 스크롤을 제공합니다. `Settings`, `Device Master`, `User Accounts`, `Audit Logs`, `Monitoring Logs`, `DB Config`, `Backend Info`, `Alert Center`처럼 내용이 긴 탭은 헤더와 메뉴를 유지한 상태로 본문만 스크롤해서 봅니다.

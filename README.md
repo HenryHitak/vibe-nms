@@ -286,7 +286,7 @@ NMS_MSSQL_ENCRYPT=true
 NMS_MSSQL_TRUST_SERVER_CERTIFICATE=true
 ```
 
-Admins can open `DB Config` in the app to use the SQL Server 2025 Express profile, test the connection, and save database settings to `C:\Program Files\Vibe NMS\.env`. Restart the `VibeNMS` scheduled task after saving. `Backend Info` shows the live backend process, database target, worker status, and API paths. The same data is available from `GET /api/backend/runtime` with an ADMIN bearer token.
+Admins can open `DB Config` in the app to use the SQL Server 2025 Express profile, test the connection, and save database settings to `C:\Program Files\Vibe NMS\.env`. Restart the `VibeNMS` scheduled task after saving. `Backend Info` shows the live backend process, database target, worker status, and API paths. ADMIN users can also change the ping monitoring interval there with a 30, 40, 50, 60, 70, 80, or 90 second option box. The same runtime data is available from `GET /api/backend/runtime` with an ADMIN bearer token.
 
 SQL Server 2025 Express design notes:
 
@@ -487,6 +487,8 @@ NMS_BOOTSTRAP_ADMIN_USERNAME=admin
 NMS_BOOTSTRAP_ADMIN_PASSWORD=admin
 NMS_BOOTSTRAP_ADMIN_EMAIL=admin@example.internal
 ```
+
+`NMS_COLLECTOR_INTERVAL_SECONDS` is the install-time default. During operation, `system_settings.monitoring_interval_seconds` controls the live ping worker interval and can be changed from `Backend Info` or `Settings` without editing `.env`.
 
 UI timestamps are displayed in `NMS_TIME_ZONE`. The Windows installer defaults this to `America/Tijuana` so Audit Logs, Monitoring Logs, Alerts, AP Clients, and Display Dashboard times use the Mexico/Tijuana time base instead of the Windows client timezone.
 

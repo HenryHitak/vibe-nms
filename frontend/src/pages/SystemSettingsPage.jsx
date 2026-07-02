@@ -13,6 +13,8 @@ const KNOWN_KEYS = [
   "corporate_networks"
 ];
 
+const MONITORING_INTERVAL_OPTIONS = [30, 40, 50, 60, 70, 80, 90];
+
 const ALERT_SETTINGS = [
   {
     key: "alert_network_warning_enabled",
@@ -198,7 +200,19 @@ export default function SystemSettingsPage() {
           {KNOWN_KEYS.map((key) => (
             <label key={key} className="block border-b border-line p-4 text-sm last:border-b-0">
               <span className="mb-1 block break-words font-medium text-slate-700">{key}</span>
-              <input className="h-10 w-full rounded-md border border-line px-3" value={settings[key] || ""} onChange={(event) => change(key, event.target.value)} />
+              {key === "monitoring_interval_seconds" ? (
+                <select
+                  className="h-10 w-full rounded-md border border-line bg-white px-3"
+                  value={settings[key] || "60"}
+                  onChange={(event) => change(key, event.target.value)}
+                >
+                  {MONITORING_INTERVAL_OPTIONS.map((seconds) => (
+                    <option key={seconds} value={seconds}>{seconds} seconds</option>
+                  ))}
+                </select>
+              ) : (
+                <input className="h-10 w-full rounded-md border border-line px-3" value={settings[key] || ""} onChange={(event) => change(key, event.target.value)} />
+              )}
             </label>
           ))}
         </section>

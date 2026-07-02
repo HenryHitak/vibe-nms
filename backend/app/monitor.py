@@ -12,6 +12,10 @@ from .config import settings
 from .db import connect, row_to_dict
 from .validation import ip_in_allowed_networks
 
+MONITORING_INTERVAL_OPTIONS = [30, 40, 50, 60, 70, 80, 90]
+MIN_MONITORING_INTERVAL_SECONDS = 30
+MAX_MONITORING_INTERVAL_SECONDS = 90
+
 
 @dataclass
 class ProbeResult:
@@ -22,6 +26,28 @@ class ProbeResult:
     tcp_fallback_port: int | None = None
     tcp_fallback_latency_ms: float | None = None
     tcp_fallback_result: str | None = None
+
+
+def normalize_monitoring_interval_seconds(value: object) -> int:
+    try:
+        interval = int(value)
+    except (TypeError, ValueError):
+        interval = int(settings.collector_interval_seconds)
+    return min(max(interval, MIN_MONITORING_INTERVAL_SECONDS), MAX_MONITORING_INTERVAL_SECONDS)
+
+
+def get_monitoring_interval_seconds(conn: sqlite3.Connection | None = None) -> int:
+    owns_connection = conn is None
+    if conn is None:
+        conn = connect()
+    try:
+        row = conn.execute("SELECT value FROM system_settings WHERE key = ?", ("monitoring_interval_seconds",)).fetchone()
+        interval = normalize_monitoring_interval_seconds(row["value"] if row else settings.collector_interval_seconds)
+        settings.collector_interval_seconds = interval
+        return interval
+    finally:
+        if owns_connection:
+            conn.close()
 
 
 async def ping_device(ip_address: str) -> ProbeResult:
@@ -354,8 +380,9 @@ async def collector_loop(stop_event: asyncio.Event) -> None:
             await run_monitoring_cycle()
         except Exception:
             pass
+        interval_seconds = get_monitoring_interval_seconds()
         try:
-            await asyncio.wait_for(stop_event.wait(), timeout=settings.collector_interval_seconds)
+            await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
         except asyncio.TimeoutError:
             continue
 

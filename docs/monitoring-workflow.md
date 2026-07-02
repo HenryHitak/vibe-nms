@@ -69,6 +69,8 @@ NMS_CRITICAL_LATENCY_MS=500
 NMS_WARNING_PACKET_LOSS_PERCENT=5
 ```
 
+`NMS_COLLECTOR_INTERVAL_SECONDS` is the install-time default. In the running app, `system_settings.monitoring_interval_seconds` is the effective ping interval. ADMIN users can change it from `Backend Info` or `Settings` with 30, 40, 50, 60, 70, 80, or 90 second options, and the next worker loop uses the new value.
+
 ## 4. ICMP Ping과 TCP fallback
 
 회사 PC는 실제로 온라인이어도 Windows Firewall 또는 endpoint security 때문에 ICMP Ping을 막을 수 있습니다.

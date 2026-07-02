@@ -138,3 +138,6 @@ NMS_TIME_ZONE=America/Tijuana
 ```
 
 이 기준은 Audit Logs, Monitoring Logs, Alerts, AP Clients, Display Dashboard에 적용됩니다.
+## Backend Info Ping Interval
+
+`Backend Info > Background Workers > Ping Interval` exposes ADMIN-only 30, 40, 50, 60, 70, 80, and 90 second options. The selected value is stored in `system_settings.monitoring_interval_seconds`; the ping worker reads that DB setting before waiting for the next loop, so changing it does not require editing `.env`.

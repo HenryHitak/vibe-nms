@@ -57,7 +57,7 @@ Config: C:\Program Files\Vibe NMS\.env
 Default SQLite DB: C:\Program Files\Vibe NMS\data\nms.sqlite
 ```
 
-Admins can open `Backend Info` in the app to see where the backend and SQL database are running.
+Admins can open `Backend Info` in the app to see where the backend and SQL database are running. ADMIN users can also change the ping monitoring interval there with a 30, 40, 50, 60, 70, 80, or 90 second option box.
 
 Device Excel import/export is inside `Device Master`:
 
@@ -148,6 +148,8 @@ Main dashboard layout:
 ```text
 NMS_COLLECTOR_INTERVAL_SECONDS=60
 ```
+
+`NMS_COLLECTOR_INTERVAL_SECONDS` is the install-time default. During operation, `system_settings.monitoring_interval_seconds` controls the live ping worker interval and can be changed from `Backend Info` or `Settings` without editing `.env`.
 
 Screen timestamps use Mexico/Tijuana by default:
 

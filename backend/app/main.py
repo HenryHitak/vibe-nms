@@ -43,7 +43,13 @@ from .import_export import (
     simple_rows_workbook,
     validate_import_rows,
 )
-from .monitor import collector_loop, run_monitoring_cycle
+from .monitor import (
+    MONITORING_INTERVAL_OPTIONS,
+    collector_loop,
+    get_monitoring_interval_seconds,
+    normalize_monitoring_interval_seconds,
+    run_monitoring_cycle,
+)
 from .schemas import (
     APClientRegistrationPatch,
     APClientRegistrationPayload,
@@ -923,6 +929,7 @@ def health() -> dict[str, str]:
 @app.get("/api/backend/runtime")
 def backend_runtime(actor: Actor = Depends(get_actor)) -> dict[str, Any]:
     require_admin(actor)
+    ping_interval_seconds = get_monitoring_interval_seconds()
     database: dict[str, Any]
     if settings.database_engine == "mssql":
         database = {
@@ -959,7 +966,8 @@ def backend_runtime(actor: Actor = Depends(get_actor)) -> dict[str, Any]:
         },
         "workers": {
             "ping_collector_enabled": settings.collector_enabled,
-            "ping_interval_seconds": settings.collector_interval_seconds,
+            "ping_interval_seconds": ping_interval_seconds,
+            "ping_interval_options": MONITORING_INTERVAL_OPTIONS,
             "ping_count": settings.ping_count,
             "tcp_fallback_ports": settings.tcp_fallback_ports,
             "ap_client_discovery_enabled": settings.ap_client_discovery_enabled,
@@ -2570,7 +2578,11 @@ def export_migration(actor: Actor = Depends(get_actor)) -> JSONResponse:
 def get_system_settings() -> dict[str, str]:
     with transaction() as conn:
         rows = conn.execute("SELECT key, value FROM system_settings ORDER BY key").fetchall()
-        return {row["key"]: row["value"] for row in rows}
+        values = {row["key"]: row["value"] for row in rows}
+        values["monitoring_interval_seconds"] = str(
+            normalize_monitoring_interval_seconds(values.get("monitoring_interval_seconds"))
+        )
+        return values
 
 
 def _clear_disabled_alarm_state(conn: sqlite3.Connection, settings_values: dict[str, Any]) -> None:
@@ -2597,6 +2609,13 @@ def _clear_disabled_alarm_state(conn: sqlite3.Connection, settings_values: dict[
     )
 
 
+def _normalize_system_setting_value(key: str, value: Any) -> str:
+    value_text = "" if value is None else str(value).strip()
+    if key == "monitoring_interval_seconds":
+        return str(normalize_monitoring_interval_seconds(value_text))
+    return value_text
+
+
 @app.put("/api/system-settings")
 def update_system_settings(payload: BulkSettingsPayload, actor: Actor = Depends(get_actor)) -> dict[str, str]:
     require_admin(actor)
@@ -2607,8 +2626,7 @@ def update_system_settings(payload: BulkSettingsPayload, actor: Actor = Depends(
             key = str(raw_key or "").strip()
             if not key:
                 continue
-            if isinstance(value, str):
-                value = value.strip()
+            value = _normalize_system_setting_value(key, value)
             exists = conn.execute("SELECT COUNT(*) FROM system_settings WHERE key = ?", (key,)).fetchone()[0]
             if exists:
                 conn.execute(
@@ -2628,6 +2646,7 @@ def update_system_settings(payload: BulkSettingsPayload, actor: Actor = Depends(
                     (key, str(value), actor.username, actor.ip_address),
                 )
         after = {row["key"]: row["value"] for row in conn.execute("SELECT key, value FROM system_settings").fetchall()}
+        settings.collector_interval_seconds = normalize_monitoring_interval_seconds(after.get("monitoring_interval_seconds"))
         _clear_disabled_alarm_state(conn, after)
         write_audit_log(
             conn,
