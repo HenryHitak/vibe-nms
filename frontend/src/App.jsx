@@ -32,6 +32,7 @@ import LoginPage from "./pages/LoginPage.jsx";
 import MonitoringLogPage from "./pages/MonitoringLogPage.jsx";
 import SourceMapModal from "./components/SourceMapModal.jsx";
 import SystemSettingsPage from "./pages/SystemSettingsPage.jsx";
+import TableColumnResizer from "./components/TableColumnResizer.jsx";
 import TrafficGraphPage from "./pages/TrafficGraphPage.jsx";
 import UserAdminPage from "./pages/UserAdminPage.jsx";
 import { useI18n } from "./i18n.jsx";
@@ -374,8 +375,18 @@ function AuthenticatedApp() {
 
 export default function App() {
   if (window.location.pathname.startsWith("/display")) {
-    return <DisplayDashboardPage />;
+    return (
+      <>
+        <TableColumnResizer />
+        <DisplayDashboardPage />
+      </>
+    );
   }
 
-  return <AuthenticatedApp />;
+  return (
+    <>
+      <TableColumnResizer />
+      <AuthenticatedApp />
+    </>
+  );
 }

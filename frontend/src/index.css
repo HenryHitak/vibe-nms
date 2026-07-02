@@ -29,3 +29,48 @@ textarea {
   scrollbar-width: thin;
 }
 
+.resizable-table {
+  table-layout: fixed;
+  width: max(100%, var(--table-resize-width, 100%));
+}
+
+.resizable-table-header {
+  position: relative;
+  overflow: visible;
+}
+
+.table-column-resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  z-index: 30;
+  display: block;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.table-column-resizer::after {
+  position: absolute;
+  top: 20%;
+  bottom: 20%;
+  left: 3px;
+  width: 2px;
+  border-radius: 999px;
+  background: #0891b2;
+  content: "";
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.resizable-table-header:hover > .table-column-resizer::after,
+.table-column-resizing .table-column-resizer::after {
+  opacity: 1;
+}
+
+.table-column-resizing,
+.table-column-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}

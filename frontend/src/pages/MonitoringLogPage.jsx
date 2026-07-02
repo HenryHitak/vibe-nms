@@ -131,7 +131,7 @@ export default function MonitoringLogPage() {
           ))}
         </div>
         <div className="table-scroll min-h-[360px] flex-1 overflow-auto rounded-md border border-line bg-white shadow-sm">
-          <table className="min-w-[1280px] text-left text-sm">
+          <table className="w-full min-w-[1280px] text-left text-sm">
             <thead className="sticky top-0 z-10 bg-slate-100 text-xs uppercase text-slate-600 shadow-[0_1px_0_0_#d8e0ea]">
               <tr>
                 <th className="px-3 py-2">Checked</th>
@@ -156,7 +156,7 @@ export default function MonitoringLogPage() {
                   <td className="px-3 py-2 tabular-nums">{formatMs(log.latency_ms)}</td>
                   <td className="px-3 py-2 tabular-nums">{formatPercent(log.packet_loss_percent)}</td>
                   <td className="px-3 py-2 tabular-nums">{log.consecutive_failure_count}</td>
-                  <td className="min-w-[420px] px-3 py-2 text-xs leading-5 text-slate-700">{reasonForLog(log, payload.thresholds)}</td>
+                  <td className="min-w-[520px] px-3 py-2 text-xs leading-5 text-slate-700">{reasonForLog(log, payload.thresholds)}</td>
                 </tr>
               ))}
               {payload.logs.length === 0 ? (

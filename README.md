@@ -78,6 +78,8 @@ UI language is controlled from `Settings > Language Settings`. The default langu
 
 Sidebar menu order can be changed by dragging menu items. Main menu items can be reordered inside the main section, and ADMIN items can be reordered inside the ADMIN section. The custom menu order is saved in the browser.
 
+All data tables support horizontal column resizing. Drag the divider on a table header to make a column wider or narrower; the width is saved in the browser for that page.
+
 The main menu shows `Dashboard` and `Alert Center`. `Traffic Graphs`, `AP Clients`, user management, Device Master, logs, DB Config, Backend Info, and Settings are under the `ADMIN` section and require an ADMIN account.
 
 ADMIN users can double-click the top-right `ADMIN / IP` user information to open the Source Map. The Source Map shows where dashboard data comes from: database tables, backend workers, API endpoints, latest ping result, latest traffic source, AP client observations, audit logs, and import history. Device IP cells in Dashboard, Device Master, and Traffic Graphs also open a device-specific Source Map on double-click.

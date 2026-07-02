@@ -200,6 +200,8 @@ Traffic Graphs 화면의 `Traffic Source`에서 provider를 `generic-api`로 바
 - 실패 이유
 - 최근 monitoring run
 
+All data tables support horizontal column resizing. Drag the divider on a table header to make a column wider or narrower; the width is saved in the browser for that page. In `Monitoring Logs`, the Reason column fills the available table width so the right side does not leave blank space.
+
 `Audit Logs`:
 
 - 로그인
