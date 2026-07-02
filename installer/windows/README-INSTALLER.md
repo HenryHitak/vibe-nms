@@ -138,7 +138,7 @@ The backend matches observations by `device_id`, `ip_address`, or `device_name`.
 Main dashboard layout:
 
 - Left side: full registered device list.
-- Right side: offline ping list, about 30% of desktop width, with a hide button that leaves only the offline count rail.
+- Right side: offline ping list, about 30% of desktop width, with a hide button. When hidden, `Offline Ping: count` appears next to the Devices title and opens the panel again.
 - Device list order: latest monitoring check or manual update first.
 - Offline ping list includes red OFFLINE/CRITICAL devices and devices with 100% packet loss.
 - Dashboard and Offline Ping tables show Status, Device, Type, IP, Plant, and Line only.

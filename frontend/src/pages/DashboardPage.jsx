@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Filter, PanelRightClose, PanelRightOpen, Search, ServerCrash } from "lucide-react";
+import { Filter, PanelRightClose, Search, ServerCrash } from "lucide-react";
 import { api } from "../api.js";
 import AlertBanner from "../components/AlertBanner.jsx";
 import DeviceDetailModal from "../components/DeviceDetailModal.jsx";
@@ -283,10 +283,21 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
           </div>
         </section>
 
-        <div className={`grid min-h-[560px] grid-cols-1 gap-5 ${offlinePanelHidden ? "xl:grid-cols-[minmax(0,1fr)_88px]" : "xl:grid-cols-[minmax(0,7fr)_minmax(420px,3fr)]"}`}>
+        <div className={`grid min-h-[560px] grid-cols-1 gap-5 ${offlinePanelHidden ? "xl:grid-cols-1" : "xl:grid-cols-[minmax(0,7fr)_minmax(420px,3fr)]"}`}>
           <section className="min-h-0">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="font-semibold">Devices</h2>
+              <div className="flex min-w-0 flex-wrap items-center gap-3">
+                <h2 className="font-semibold">Devices</h2>
+                {offlinePanelHidden ? (
+                  <button
+                    className="inline-flex h-7 items-center rounded-md border border-red-200 bg-red-50 px-2 text-xs font-semibold text-red-800 hover:bg-red-100"
+                    title="Show Offline Ping"
+                    onClick={() => setOfflinePanelHidden(false)}
+                  >
+                    Offline Ping: <span className="ml-1 tabular-nums">{offlineDevices.length}</span>
+                  </button>
+                ) : null}
+              </div>
               <span className="text-sm text-slate-500">Latest update first</span>
             </div>
             <DeviceTable
@@ -299,45 +310,34 @@ export default function DashboardPage({ role, onOpenSourceMap }) {
             />
           </section>
 
-          <aside className={`min-h-0 rounded-md border border-red-200 bg-white shadow-sm ${offlinePanelHidden ? "overflow-hidden" : ""}`}>
-            {offlinePanelHidden ? (
-              <button
-                className="flex h-[calc(100vh-285px)] min-h-[560px] w-full flex-col items-center justify-center gap-3 bg-red-50 px-2 text-red-900 hover:bg-red-100"
-                title="Show Offline Ping"
-                onClick={() => setOfflinePanelHidden(false)}
-              >
-                <PanelRightOpen size={18} />
-                <span className="rounded border border-red-200 bg-white px-2 py-1 text-sm font-bold tabular-nums">{offlineDevices.length}</span>
-              </button>
-            ) : (
-              <>
-                <div className="flex items-center justify-between gap-3 border-b border-red-100 px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <ServerCrash size={18} className="text-red-nms" />
-                    <h2 className="font-semibold">Offline Ping</h2>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-800">{offlineDevices.length}</span>
-                    <button
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 bg-white text-red-800 hover:bg-red-50"
-                      title="Hide Offline Ping"
-                      onClick={() => setOfflinePanelHidden(true)}
-                    >
-                      <PanelRightClose size={16} />
-                    </button>
-                  </div>
+          {!offlinePanelHidden ? (
+            <aside className="min-h-0 rounded-md border border-red-200 bg-white shadow-sm">
+              <div className="flex items-center justify-between gap-3 border-b border-red-100 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <ServerCrash size={18} className="text-red-nms" />
+                  <h2 className="font-semibold">Offline Ping</h2>
                 </div>
-                <DeviceTable
-                  devices={offlineDevices.map((device) => ({ ...device, status: "OFFLINE" }))}
-                  selectedId={detailOpen ? detailDevice?.id : null}
-                  onSelect={openDeviceDetail}
-                  onIpDoubleClick={String(role || "").toUpperCase() === "ADMIN" ? openSourceMapForDevice : undefined}
-                  columns={DASHBOARD_COLUMNS}
-                  className="h-[calc(100vh-335px)] min-h-[510px] border-0"
-                />
-              </>
-            )}
-          </aside>
+                <div className="flex items-center gap-2">
+                  <span className="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-800">{offlineDevices.length}</span>
+                  <button
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 bg-white text-red-800 hover:bg-red-50"
+                    title="Hide Offline Ping"
+                    onClick={() => setOfflinePanelHidden(true)}
+                  >
+                    <PanelRightClose size={16} />
+                  </button>
+                </div>
+              </div>
+              <DeviceTable
+                devices={offlineDevices.map((device) => ({ ...device, status: "OFFLINE" }))}
+                selectedId={detailOpen ? detailDevice?.id : null}
+                onSelect={openDeviceDetail}
+                onIpDoubleClick={String(role || "").toUpperCase() === "ADMIN" ? openSourceMapForDevice : undefined}
+                columns={DASHBOARD_COLUMNS}
+                className="h-[calc(100vh-335px)] min-h-[510px] border-0"
+              />
+            </aside>
+          ) : null}
         </div>
       </div>
       <DeviceDetailModal

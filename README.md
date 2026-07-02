@@ -88,7 +88,7 @@ The main dashboard is focused on live device operations:
 
 - Left side: full registered device list.
 - Right side: offline ping list, approximately 30% of the page width on desktop.
-- The offline ping panel can be hidden; when hidden it remains as a right-side count rail.
+- The offline ping panel can be hidden; when hidden, `Offline Ping: count` appears next to the Devices title and opens the panel again.
 - Device list order: latest monitoring check or manual update first.
 - Dashboard device status is displayed as `ONLINE` or `OFFLINE` only.
 - Offline ping list includes devices whose raw monitoring status is OFFLINE/CRITICAL or whose packet loss is 100%.
