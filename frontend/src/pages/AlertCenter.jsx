@@ -33,6 +33,7 @@ function TypeBadge({ value, muted }) {
 }
 
 export default function AlertCenter({ role = "USER" }) {
+  const isAdmin = String(role || "").toUpperCase() === "ADMIN";
   const [alerts, setAlerts] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [mutes, setMutes] = useState([]);
@@ -45,15 +46,20 @@ export default function AlertCenter({ role = "USER" }) {
 
   async function load() {
     try {
-      const query = status ? `?status=${status}` : "";
-      const [alertPayload, notificationPayload, mutePayload] = await Promise.all([
-        api(`/alerts${query}`),
-        api("/notifications?unread_only=false"),
-        api("/notification-mutes")
-      ]);
-      setAlerts(alertPayload);
+      const notificationPayload = await api("/notifications?unread_only=false");
       setNotifications(notificationPayload);
-      setMutes(mutePayload);
+      if (isAdmin) {
+        const query = status ? `?status=${status}` : "";
+        const [alertPayload, mutePayload] = await Promise.all([
+          api(`/alerts${query}`),
+          api("/notification-mutes")
+        ]);
+        setAlerts(alertPayload);
+        setMutes(mutePayload);
+      } else {
+        setAlerts([]);
+        setMutes([]);
+      }
       setError("");
     } catch (err) {
       setError(err.message);
@@ -62,7 +68,9 @@ export default function AlertCenter({ role = "USER" }) {
 
   useEffect(() => {
     load();
-  }, [status]);
+    const timer = setInterval(load, 5000);
+    return () => clearInterval(timer);
+  }, [isAdmin, status]);
 
   async function handleAlert(id, name) {
     try {
@@ -110,6 +118,70 @@ export default function AlertCenter({ role = "USER" }) {
         {muted ? <Bell size={14} /> : <BellOff size={14} />}
         {muted ? "Unmute" : "Mute"}
       </button>
+    );
+  }
+
+  function NotificationList({ adminActions = false, className = "" }) {
+    return (
+      <aside className={className}>
+        <div className="flex items-center justify-between border-b border-line px-4 py-3">
+          <div>
+            <h2 className="font-semibold text-ink">Notification List</h2>
+            <div className="text-xs text-slate-500">{notifications.filter((item) => !item.read_at).length} unread / {notifications.length} recent</div>
+          </div>
+        </div>
+        <div className="max-h-[calc(100vh-250px)] overflow-auto">
+          {notifications.map((notification) => {
+            const muted = muteMap[notification.alert_type];
+            return (
+              <div key={notification.id} className={`border-b border-line px-4 py-3 last:border-b-0 ${notification.read_at ? "bg-white" : "bg-red-50/40"}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <TypeBadge value={notification.alert_type} muted={muted} />
+                      {notification.severity ? <Severity value={notification.severity} /> : null}
+                      {muted ? <span className="text-xs font-semibold text-slate-500">MUTED</span> : null}
+                    </div>
+                    <div className="mt-2 font-semibold text-ink">{notification.title}</div>
+                    <div className="mt-1 text-sm text-slate-600">{notification.message}</div>
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                      <span>{formatTijuanaDateTime(notification.created_at)}</span>
+                      <span>{notification.device_name || "-"}</span>
+                      <span>{notification.ip_address || "-"}</span>
+                    </div>
+                    {adminActions && notification.alert_type ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {muteButton(notification.alert_type)}
+                        {!notification.read_at ? (
+                          <button
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            title="Mark notification as read"
+                            onClick={() => markRead(notification.id)}
+                          >
+                            <X size={14} /> Mark Read
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {notifications.length === 0 ? (
+            <div className="px-4 py-10 text-center text-sm text-slate-500">No notifications</div>
+          ) : null}
+        </div>
+      </aside>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <AdminLayout title="Notification List">
+        {error ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div> : null}
+        <NotificationList className="min-w-0 border border-line bg-white" />
+      </AdminLayout>
     );
   }
 
@@ -203,56 +275,7 @@ export default function AlertCenter({ role = "USER" }) {
           </div>
         </section>
 
-        <aside className="min-w-0 border border-line bg-white">
-          <div className="flex items-center justify-between border-b border-line px-4 py-3">
-            <div>
-              <h2 className="font-semibold text-ink">Notification List</h2>
-              <div className="text-xs text-slate-500">{notifications.filter((item) => !item.read_at).length} unread / {notifications.length} recent</div>
-            </div>
-          </div>
-          <div className="max-h-[calc(100vh-250px)] overflow-auto">
-            {notifications.map((notification) => {
-              const muted = muteMap[notification.alert_type];
-              return (
-                <div key={notification.id} className={`border-b border-line px-4 py-3 last:border-b-0 ${notification.read_at ? "bg-white" : "bg-red-50/40"}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <TypeBadge value={notification.alert_type} muted={muted} />
-                        {notification.severity ? <Severity value={notification.severity} /> : null}
-                        {muted ? <span className="text-xs font-semibold text-slate-500">MUTED</span> : null}
-                      </div>
-                      <div className="mt-2 font-semibold text-ink">{notification.title}</div>
-                      <div className="mt-1 text-sm text-slate-600">{notification.message}</div>
-                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-                        <span>{formatTijuanaDateTime(notification.created_at)}</span>
-                        <span>{notification.device_name || "-"}</span>
-                        <span>{notification.ip_address || "-"}</span>
-                      </div>
-                      {role === "ADMIN" && notification.alert_type ? (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {muteButton(notification.alert_type)}
-                          {!notification.read_at ? (
-                            <button
-                              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                              title="Mark notification as read"
-                              onClick={() => markRead(notification.id)}
-                            >
-                              <X size={14} /> Mark Read
-                            </button>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {notifications.length === 0 ? (
-              <div className="px-4 py-10 text-center text-sm text-slate-500">No notifications</div>
-            ) : null}
-          </div>
-        </aside>
+        <NotificationList adminActions className="min-w-0 border border-line bg-white" />
       </div>
     </AdminLayout>
   );

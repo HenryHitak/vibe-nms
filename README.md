@@ -86,10 +86,14 @@ The main dashboard is focused on live device operations:
 
 - Left side: full registered device list.
 - Right side: offline ping list, approximately 30% of the page width on desktop.
+- The offline ping panel can be hidden; when hidden it remains as a right-side count rail.
 - Device list order: latest monitoring check or manual update first.
 - Dashboard device status is displayed as `ONLINE` or `OFFLINE` only.
 - Offline ping list includes devices whose raw monitoring status is OFFLINE/CRITICAL or whose packet loss is 100%.
+- Dashboard and Offline Ping tables show only Status, Device, Type, IP, Plant, and Line. AP, Switch, and ICMP Loss stay available in hover preview and detail views.
 - Dashboard search checks device name, type, status, IP, MAC, hostname, Plant, Line, location, AP, Switch, VLAN, owner, criticality, latest check, reason, and notes. Matching devices appear under the search box while typing.
+- Press `Enter` in the dashboard search box to open the first matching device.
+- The dashboard refreshes from backend monitoring data every 60 seconds. The browser does not ping devices directly.
 
 ## AP Client Discovery
 
@@ -461,7 +465,7 @@ NMS_TRUSTED_PROXY_IPS=10.0.0.10,10.0.0.11
 NMS_CORPORATE_NETWORKS=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
 NMS_TIME_ZONE=America/Tijuana
 NMS_COLLECTOR_ENABLED=true
-NMS_COLLECTOR_INTERVAL_SECONDS=30
+NMS_COLLECTOR_INTERVAL_SECONDS=60
 NMS_COLLECTOR_TIMEOUT_MS=1000
 NMS_PING_COUNT=3
 NMS_TCP_FALLBACK_PORTS=445,3389,80,443
@@ -488,7 +492,7 @@ UI timestamps are displayed in `NMS_TIME_ZONE`. The Windows installer defaults t
 
 ```text
 ADMIN = can create/update/delete devices, import/export, manage alerts, change settings, and create USER/ADMIN accounts
-USER = read-only dashboard and alert center access
+USER = read-only Dashboard and Alert Center access. USER menus show only Dashboard and Alert Center, and Alert Center shows the notification list only.
 ```
 
 All `/api` routes except `/api/auth/login` require a bearer token from login.

@@ -140,8 +140,13 @@ function DeviceHoverPreview({ device, position }) {
   );
 }
 
-export default function DeviceTable({ devices = [], selectedId, onSelect, onIpDoubleClick, actions, className = "" }) {
+const DEFAULT_COLUMNS = ["status", "device", "type", "ip", "plant", "line", "ap", "switch", "loss"];
+
+export default function DeviceTable({ devices = [], selectedId, onSelect, onIpDoubleClick, actions, className = "", columns = DEFAULT_COLUMNS }) {
   const [preview, setPreview] = useState({ device: null, position: { left: 0, top: 0 } });
+  const visibleColumns = columns.filter((column) => DEFAULT_COLUMNS.includes(column));
+  const hasColumn = (column) => visibleColumns.includes(column);
+  const totalColumns = visibleColumns.length + (actions ? 1 : 0);
 
   function showPreview(device, event) {
     setPreview({ device, position: previewPosition(event) });
@@ -167,15 +172,15 @@ export default function DeviceTable({ devices = [], selectedId, onSelect, onIpDo
       <table className="min-w-full border-collapse text-left text-sm">
         <thead className="sticky top-0 bg-slate-100 text-xs uppercase text-slate-600">
           <tr>
-            <th className="px-3 py-2">Status</th>
-            <th className="px-3 py-2">Device</th>
-            <th className="px-3 py-2">Type</th>
-            <th className="px-3 py-2">IP</th>
-            <th className="px-3 py-2">Plant</th>
-            <th className="px-3 py-2">Line</th>
-            <th className="px-3 py-2">AP</th>
-            <th className="px-3 py-2">Switch</th>
-            <th className="px-3 py-2">ICMP Loss</th>
+            {hasColumn("status") ? <th className="px-3 py-2">Status</th> : null}
+            {hasColumn("device") ? <th className="px-3 py-2">Device</th> : null}
+            {hasColumn("type") ? <th className="px-3 py-2">Type</th> : null}
+            {hasColumn("ip") ? <th className="px-3 py-2">IP</th> : null}
+            {hasColumn("plant") ? <th className="px-3 py-2">Plant</th> : null}
+            {hasColumn("line") ? <th className="px-3 py-2">Line</th> : null}
+            {hasColumn("ap") ? <th className="px-3 py-2">AP</th> : null}
+            {hasColumn("switch") ? <th className="px-3 py-2">Switch</th> : null}
+            {hasColumn("loss") ? <th className="px-3 py-2">ICMP Loss</th> : null}
             {actions ? <th className="px-3 py-2 text-right">Actions</th> : null}
           </tr>
         </thead>
@@ -189,27 +194,29 @@ export default function DeviceTable({ devices = [], selectedId, onSelect, onIpDo
               onMouseMove={movePreview}
               onMouseLeave={hidePreview}
             >
-              <td className="px-3 py-2"><StatusBadge status={device.status} /></td>
-              <td className="px-3 py-2 font-semibold text-ink">{device.device_name}</td>
-              <td className="px-3 py-2"><DeviceTypeBadge type={device.device_type} /></td>
-              <td
-                className={`px-3 py-2 tabular-nums ${onIpDoubleClick ? "cursor-help hover:text-cyan-700 hover:underline" : ""}`}
-                title={onIpDoubleClick ? "Double-click to open Source Map" : undefined}
-                onDoubleClick={(event) => {
-                  if (!onIpDoubleClick) return;
-                  event.preventDefault();
-                  event.stopPropagation();
-                  hidePreview();
-                  onIpDoubleClick(device);
-                }}
-              >
-                {device.ip_address}
-              </td>
-              <td className="px-3 py-2">{device.plant_name || device.plant_code}</td>
-              <td className="px-3 py-2">{device.line_name || device.line_code}</td>
-              <td className="px-3 py-2">{device.connected_ap_name || "-"}</td>
-              <td className="px-3 py-2">{[device.switch_name, device.switch_port].filter(Boolean).join(" / ") || "-"}</td>
-              <td className="px-3 py-2 tabular-nums">{device.packet_loss_percent ?? "-"}</td>
+              {hasColumn("status") ? <td className="px-3 py-2"><StatusBadge status={device.status} /></td> : null}
+              {hasColumn("device") ? <td className="px-3 py-2 font-semibold text-ink">{device.device_name}</td> : null}
+              {hasColumn("type") ? <td className="px-3 py-2"><DeviceTypeBadge type={device.device_type} /></td> : null}
+              {hasColumn("ip") ? (
+                <td
+                  className={`px-3 py-2 tabular-nums ${onIpDoubleClick ? "cursor-help hover:text-cyan-700 hover:underline" : ""}`}
+                  title={onIpDoubleClick ? "Double-click to open Source Map" : undefined}
+                  onDoubleClick={(event) => {
+                    if (!onIpDoubleClick) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    hidePreview();
+                    onIpDoubleClick(device);
+                  }}
+                >
+                  {device.ip_address}
+                </td>
+              ) : null}
+              {hasColumn("plant") ? <td className="px-3 py-2">{device.plant_name || device.plant_code}</td> : null}
+              {hasColumn("line") ? <td className="px-3 py-2">{device.line_name || device.line_code}</td> : null}
+              {hasColumn("ap") ? <td className="px-3 py-2">{device.connected_ap_name || "-"}</td> : null}
+              {hasColumn("switch") ? <td className="px-3 py-2">{[device.switch_name, device.switch_port].filter(Boolean).join(" / ") || "-"}</td> : null}
+              {hasColumn("loss") ? <td className="px-3 py-2 tabular-nums">{device.packet_loss_percent ?? "-"}</td> : null}
               {actions ? (
                 <td className="px-3 py-2 text-right" onClick={(event) => event.stopPropagation()}>
                   {actions(device)}
@@ -219,7 +226,7 @@ export default function DeviceTable({ devices = [], selectedId, onSelect, onIpDo
           ))}
           {devices.length === 0 ? (
             <tr>
-              <td className="px-3 py-8 text-center text-slate-500" colSpan={actions ? 10 : 9}>No devices</td>
+              <td className="px-3 py-8 text-center text-slate-500" colSpan={totalColumns}>No devices</td>
             </tr>
           ) : null}
         </tbody>

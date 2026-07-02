@@ -46,7 +46,7 @@ class Settings:
     trusted_proxy_ips = set(_csv(os.getenv("NMS_TRUSTED_PROXY_IPS", "")))
     corporate_networks = _csv(os.getenv("NMS_CORPORATE_NETWORKS", "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"))
     collector_enabled = _bool(os.getenv("NMS_COLLECTOR_ENABLED"), True)
-    collector_interval_seconds = int(os.getenv("NMS_COLLECTOR_INTERVAL_SECONDS", "30"))
+    collector_interval_seconds = int(os.getenv("NMS_COLLECTOR_INTERVAL_SECONDS", "60"))
     collector_timeout_ms = int(os.getenv("NMS_COLLECTOR_TIMEOUT_MS", "1000"))
     ping_count = max(1, int(os.getenv("NMS_PING_COUNT", "3")))
     tcp_fallback_ports = _csv_ints(os.getenv("NMS_TCP_FALLBACK_PORTS", "445,3389,80,443"))

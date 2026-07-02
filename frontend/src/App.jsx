@@ -47,6 +47,7 @@ const ADMIN_ROUTES = [
 ];
 
 const PRIMARY_ROUTE_KEYS = ["dashboard", "traffic", "alerts", "ap-clients"];
+const USER_ROUTE_KEYS = ["dashboard", "alerts"];
 const ADMIN_ROUTE_KEYS = ADMIN_ROUTES.map((item) => item.key);
 const MENU_ORDER_STORAGE_KEY = "nms.menuOrder";
 
@@ -96,12 +97,14 @@ function AuthenticatedApp() {
   const role = normalizeRole(user?.role);
 
   const { primaryRoutes, adminRoutes, routes } = useMemo(() => {
-    const primary = [
+    const allPrimary = [
       { key: "dashboard", labelKey: "routes.dashboard", icon: Gauge, page: DashboardPage },
       { key: "traffic", labelKey: "routes.traffic", icon: Activity, page: TrafficGraphPage },
       { key: "alerts", labelKey: "routes.alerts", icon: BellRing, page: AlertCenter },
       { key: "ap-clients", labelKey: "routes.apClients", icon: Wifi, page: APClientDiscoveryPage }
     ].map((item) => ({ ...item, label: t(item.labelKey) }));
+    const allowedPrimaryKeys = role === "ADMIN" ? PRIMARY_ROUTE_KEYS : USER_ROUTE_KEYS;
+    const primary = allPrimary.filter((item) => allowedPrimaryKeys.includes(item.key));
     const admin = ADMIN_ROUTES.map((item) => ({ ...item, label: t(item.labelKey) }));
     const orderedPrimary = orderedByPreference(primary, menuOrder.primary);
     const orderedAdmin = role === "ADMIN" ? orderedByPreference(admin, menuOrder.admin) : [];
