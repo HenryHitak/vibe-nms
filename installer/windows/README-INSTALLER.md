@@ -138,9 +138,16 @@ The backend matches observations by `device_id`, `ip_address`, or `device_name`.
 Main dashboard layout:
 
 - Left side: full registered device list.
-- Right side: offline ping list, about 30% of desktop width.
+- Right side: offline ping list, about 30% of desktop width, with a hide button that leaves only the offline count rail.
 - Device list order: latest monitoring check or manual update first.
 - Offline ping list includes red OFFLINE/CRITICAL devices and devices with 100% packet loss.
+- Dashboard and Offline Ping tables show Status, Device, Type, IP, Plant, and Line only.
+- Dashboard search opens the first matching device when Enter is pressed.
+- Backend ping monitoring runs every 60 seconds by default:
+
+```text
+NMS_COLLECTOR_INTERVAL_SECONDS=60
+```
 
 Screen timestamps use Mexico/Tijuana by default:
 

@@ -249,6 +249,7 @@ NMS_ALLOWED_ORIGINS=$allowedOrigins
 NMS_CORPORATE_NETWORKS=$corporateNetworks
 NMS_TIME_ZONE=America/Tijuana
 NMS_COLLECTOR_ENABLED=true
+NMS_COLLECTOR_INTERVAL_SECONDS=60
 NMS_PING_COUNT=3
 NMS_TCP_FALLBACK_PORTS=445,3389,80,443
 NMS_TRAFFIC_COLLECTION_ENABLED=true
@@ -274,6 +275,7 @@ NMS_SEED_SAMPLE_DATA=false
         "NMS_ALLOWED_ORIGINS" = ($accessUrls -join ",")
         "NMS_CORPORATE_NETWORKS" = (Merge-CsvValues -Existing $existingCorporateNetworks -Additional $corporateNetworks)
         "NMS_TIME_ZONE" = "America/Tijuana"
+        "NMS_COLLECTOR_INTERVAL_SECONDS" = "60"
         "NMS_PING_COUNT" = "3"
         "NMS_TCP_FALLBACK_PORTS" = "445,3389,80,443"
     }
