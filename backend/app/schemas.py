@@ -71,6 +71,10 @@ class ImportCommitRequest(TrimmedModel):
     import_job_id: int = Field(..., gt=0)
 
 
+class SelectedDevicesExportRequest(TrimmedModel):
+    device_ids: list[int] = Field(..., min_length=1, max_length=500)
+
+
 class NotificationReadRequest(TrimmedModel):
     read: bool = True
 

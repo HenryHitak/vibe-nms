@@ -71,7 +71,7 @@ SQL Server 2025 Express에서는 SQL Agent, Enterprise 기능, CLR이 필요 없
 - 로그인과 ADMIN/USER 권한 확인
 - Device Master CRUD
 - User Accounts CRUD
-- Excel import/export
+- Excel import/export, including Dashboard selected-device XLSX export
 - Audit Logs 기록
 - Alert 생성, notification list 제공, notification mute
 - DB Config 저장과 connection test

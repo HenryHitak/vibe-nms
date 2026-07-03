@@ -145,7 +145,7 @@ Main dashboard layout:
 - Offline ping list includes red OFFLINE/CRITICAL devices and devices with 100% packet loss.
 - Dashboard and Offline Ping tables show Status, Device, Type, IP, Plant, and Line only.
 - The Dashboard filter bar shows `Ping rerun` beside the Line filter so operators can see the next backend ping cycle countdown.
-- Devices can be multi-selected with checkboxes. Click `Selected: count` to open a modal that lists all selected device information.
+- Devices can be multi-selected with checkboxes. Click `Selected: count` to open one compact table with all selected device information, then click `Excel` to download `selected-devices.xlsx`.
 - Dashboard search applies the typed value to the device list when Enter is pressed or Confirm is clicked. It does not open device detail.
 - All data tables support horizontal column resizing. Drag the divider on a table header to make a column wider or narrower; the width is saved in the browser for that page.
 - Backend ping monitoring runs every 60 seconds by default:

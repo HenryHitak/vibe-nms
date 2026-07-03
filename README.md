@@ -96,7 +96,7 @@ The main dashboard is focused on live device operations:
 - Offline ping list includes devices whose raw monitoring status is OFFLINE/CRITICAL or whose packet loss is 100%.
 - Dashboard and Offline Ping tables show only Status, Device, Type, IP, Plant, and Line. AP, Switch, and ICMP Loss stay available in hover preview and detail views.
 - The Dashboard filter bar shows `Ping rerun` beside the Line filter so operators can see the next backend ping cycle countdown.
-- Devices can be multi-selected with checkboxes. Click `Selected: count` to open a modal that lists all selected device information.
+- Devices can be multi-selected with checkboxes. Click `Selected: count` to open one compact table with all selected device information, then click `Excel` to download `selected-devices.xlsx`.
 - Dashboard search checks device name, type, status, IP, MAC, hostname, Plant, Line, location, AP, Switch, VLAN, owner, criticality, latest check, reason, and notes. Matching devices appear under the search box while typing.
 - Press `Enter` or click `Confirm` in the dashboard search box to apply the search to the device list. It does not open device detail.
 - The dashboard refreshes from backend monitoring data every 60 seconds. The browser does not ping devices directly.
@@ -560,6 +560,7 @@ Admin export endpoints:
 
 ```text
 GET /api/export/devices.xlsx
+POST /api/export/selected-devices.xlsx
 GET /api/export/plants.xlsx
 GET /api/export/access-points.xlsx
 GET /api/export/audit-logs.xlsx
@@ -585,6 +586,8 @@ database_backup.sqlite
 When running against MS SQL Server, the full backup includes `mssql_schema.sql` and `migration.json`. Use SQL Server backup tooling for physical `.bak` backups.
 
 Every export writes an audit log with username and source IP.
+
+`POST /api/export/selected-devices.xlsx` accepts `{ "device_ids": [1, 2, 3] }` and exports the selected dashboard devices in the same order. It is available to logged-in USER and ADMIN accounts because it only exports data already visible on the Dashboard.
 
 ## Restore and Import
 

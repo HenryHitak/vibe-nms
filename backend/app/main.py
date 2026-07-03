@@ -42,6 +42,7 @@ from .import_export import (
     plants_rows,
     simple_rows_workbook,
     validate_import_rows,
+    workbook_from_rows,
 )
 from .monitor import (
     MONITORING_INTERVAL_OPTIONS,
@@ -62,6 +63,7 @@ from .schemas import (
     LoginRequest,
     NotificationMutePayload,
     PasswordResetPayload,
+    SelectedDevicesExportRequest,
     TrafficConfigPayload,
     TrafficObservationIngestRequest,
     UserCreatePayload,
@@ -246,6 +248,99 @@ def _get_device(conn: sqlite3.Connection, device_id: int) -> dict[str, Any]:
     if not row:
         raise HTTPException(status_code=404, detail="Device not found")
     return row_to_dict(row) or {}
+
+
+SELECTED_DEVICE_EXPORT_COLUMNS = [
+    ("Status", "status"),
+    ("Device", "device_name"),
+    ("Device Type", "device_type"),
+    ("IP Address", "ip_address"),
+    ("MAC Address", "mac_address"),
+    ("Hostname", "hostname"),
+    ("Plant", "plant_display"),
+    ("Line", "line_display"),
+    ("Location", "location_path"),
+    ("Detailed Location", "detailed_location"),
+    ("Connected AP Name", "connected_ap_name"),
+    ("Connected AP IP", "connected_ap_ip"),
+    ("AP Vendor", "ap_vendor"),
+    ("AP Controller Type", "ap_controller_type"),
+    ("AP Controller ID", "ap_controller_id"),
+    ("Switch Name", "switch_name"),
+    ("Switch Port", "switch_port"),
+    ("VLAN", "vlan"),
+    ("Owner Department", "owner_department"),
+    ("Criticality", "criticality"),
+    ("Monitoring Enabled", "monitoring_enabled_text"),
+    ("Latest Check Method", "latest_check_method"),
+    ("Latency Ms", "latency_ms"),
+    ("Packet Loss Percent", "packet_loss_percent"),
+    ("Consecutive Failure Count", "consecutive_failure_count"),
+    ("Latest Checked At Mexico Tijuana", "latest_checked_at_local"),
+    ("Active Alert Count", "active_alert_count"),
+    ("Latest Monitoring Reason", "latest_monitoring_reason"),
+    ("Notes", "notes"),
+    ("Created By", "created_by"),
+    ("Created At Mexico Tijuana", "created_at_local"),
+    ("Updated By", "updated_by"),
+    ("Updated At Mexico Tijuana", "updated_at_local"),
+    ("Deleted", "is_deleted_text"),
+]
+
+
+def _selected_device_export_rows(conn: sqlite3.Connection, requested_ids: list[int]) -> list[dict[str, Any]]:
+    device_ids: list[int] = []
+    seen: set[int] = set()
+    for raw_id in requested_ids:
+        device_id = int(raw_id)
+        if device_id <= 0 or device_id in seen:
+            continue
+        device_ids.append(device_id)
+        seen.add(device_id)
+    if not device_ids:
+        raise HTTPException(status_code=422, detail="Select at least one valid device")
+
+    placeholders = ", ".join(["?"] * len(device_ids))
+    rows = rows_to_dicts(
+        conn.execute(
+            f"""
+            SELECT d.*,
+                   (SELECT COUNT(*) FROM alerts a WHERE a.device_id = d.id AND a.status = 'ACTIVE') AS active_alert_count,
+                   latest.check_method AS latest_check_method,
+                   latest.error_message AS latest_monitoring_reason,
+                   latest.checked_at AS latest_checked_at
+            FROM network_devices d
+            LEFT JOIN (
+                SELECT device_id, check_method, error_message, checked_at
+                FROM (
+                    SELECT device_id, check_method, error_message, checked_at,
+                           ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY checked_at DESC, id DESC) AS rn
+                    FROM device_metrics
+                ) ranked_metrics
+                WHERE rn = 1
+            ) latest ON latest.device_id = d.id
+            WHERE d.id IN ({placeholders}) AND d.is_deleted = 0
+            """,
+            device_ids,
+        ).fetchall()
+    )
+
+    by_id = {int(row["id"]): row for row in rows}
+    ordered_rows = [by_id[device_id] for device_id in device_ids if device_id in by_id]
+    for row in ordered_rows:
+        row["plant_display"] = row.get("plant_name") or row.get("plant_code")
+        row["line_display"] = row.get("line_name") or row.get("line_code")
+        row["location_path"] = " / ".join(
+            str(value)
+            for value in [row.get("building"), row.get("floor"), row.get("area"), row.get("zone")]
+            if value
+        )
+        row["monitoring_enabled_text"] = "Yes" if row.get("monitoring_enabled") else "No"
+        row["is_deleted_text"] = "Yes" if row.get("is_deleted") else "No"
+        row["latest_checked_at_local"] = utc_storage_to_local_label(row.get("latest_checked_at")) or ""
+        row["created_at_local"] = utc_storage_to_local_label(row.get("created_at")) or ""
+        row["updated_at_local"] = utc_storage_to_local_label(row.get("updated_at")) or ""
+    return ordered_rows
 
 
 def _get_user_or_404(conn: sqlite3.Connection, user_id: int) -> dict[str, Any]:
@@ -2552,6 +2647,15 @@ def export_devices(actor: Actor = Depends(get_actor)) -> StreamingResponse:
         payload = devices_workbook(conn, include_deleted=True)
         export_job(conn, actor, "devices", "devices.xlsx", len(rows))
     return _stream_bytes(payload, "devices.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@app.post("/api/export/selected-devices.xlsx")
+def export_selected_devices(payload: SelectedDevicesExportRequest, actor: Actor = Depends(get_actor)) -> StreamingResponse:
+    with transaction() as conn:
+        rows = _selected_device_export_rows(conn, payload.device_ids)
+        workbook_payload = workbook_from_rows("selected_devices", SELECTED_DEVICE_EXPORT_COLUMNS, rows)
+        export_job(conn, actor, "selected-devices", "selected-devices.xlsx", len(rows))
+    return _stream_bytes(workbook_payload, "selected-devices.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 @app.get("/api/export/plants.xlsx")

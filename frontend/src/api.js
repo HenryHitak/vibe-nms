@@ -92,10 +92,19 @@ export function downloadUrl(path) {
   return `${API_BASE}${path}`;
 }
 
-export async function downloadFile(path, filename) {
-  const response = await fetch(downloadUrl(path), { headers: getActorHeaders() });
+async function downloadBlobResponse(response, filename) {
   if (!response.ok) {
-    const detail = await response.text();
+    if (response.status === 401) {
+      clearSession();
+    }
+    const detailText = await response.text();
+    let detail = detailText;
+    try {
+      const payload = JSON.parse(detailText);
+      detail = formatErrorDetail(payload?.detail || payload) || detailText;
+    } catch {
+      // Use raw text for non-JSON download errors.
+    }
     throw new Error(detail || `Download failed: ${response.status}`);
   }
   const blob = await response.blob();
@@ -107,4 +116,21 @@ export async function downloadFile(path, filename) {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+export async function downloadFile(path, filename) {
+  const response = await fetch(downloadUrl(path), { headers: getActorHeaders() });
+  await downloadBlobResponse(response, filename);
+}
+
+export async function downloadPostFile(path, payload, filename) {
+  const response = await fetch(downloadUrl(path), {
+    method: "POST",
+    headers: {
+      ...getActorHeaders(),
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+  await downloadBlobResponse(response, filename);
 }
